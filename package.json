@@ -1,0 +1,23 @@
+{
+  "name": "event-horizon",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An orbital observatory of anonymized knowledge topology.",
+  "license": "MIT",
+  "author": "TR Ingram",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "test:smoke": "playwright test"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "vite": "^7.3.1"
+  }
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Event Horizon — A knowledge observatory</title>
+  <meta name="description" content="An interactive orbital observatory of knowledge connections. Topology only. No note content." />
+  <meta name="theme-color" content="#060709" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2306080a'/%3E%3Cellipse cx='32' cy='32' rx='27' ry='9' fill='none' stroke='%23e8a15b' stroke-width='3' transform='rotate(-18 32 32)'/%3E%3Ccircle cx='32' cy='32' r='15' fill='%2306080a' stroke='%23ffd69e' stroke-width='2'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <a class="skip-link" href="#sector-list">Skip to sector controls</a>
+  <div id="app" data-state="loading">
+    <div id="observatory" class="observatory" data-renderer="pending"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="film-grain" aria-hidden="true"></div>
+    <header class="masthead">
+      <a class="wordmark" href="./" aria-label="Event Horizon home">
+        <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9"/><ellipse cx="18" cy="18" rx="17" ry="5" transform="rotate(-28 18 18)"/></svg>
+        <span>EH<span class="wordmark-divider">/</span><span class="wordmark-sub">A KNOWLEDGE OBSERVATORY</span></span>
+      </a>
+      <div class="masthead-right"><span class="privacy-tag">TOPOLOGY, NOT CONTENT</span><button id="about-button" class="icon-button" aria-label="About this observatory">i</button></div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="title">
+        <p class="eyebrow"><span class="tiny-cross">+</span> AN EXPLORATION OF CONNECTED THOUGHT</p>
+        <h1 id="title" aria-label="Event Horizon">EVENT<br>HORIZON</h1>
+        <p class="intro-description">A second brain, seen from a distance.</p>
+      </section>
+
+      <section class="telemetry" aria-label="Topology totals">
+        <div><span id="notes-total" class="metric">—</span><span class="eyebrow">NOTES</span></div>
+        <div><span id="links-total" class="metric">—</span><span class="eyebrow">CONNECTIONS</span></div>
+        <div><span id="sectors-total" class="metric">—</span><span class="eyebrow">SECTORS</span></div>
+      </section>
+
+      <section id="sectors-panel" class="sectors-panel glass" aria-labelledby="sectors-title">
+        <div class="panel-heading"><span class="eyebrow">ORBITAL SYSTEMS</span><span id="sector-fraction" class="eyebrow">—</span></div>
+        <h2 id="sectors-title">Constellations</h2>
+        <p class="panel-description">Select a sector. Follow a connection.</p>
+        <nav id="sector-list" aria-label="Constellations" tabindex="-1"></nav>
+        <div class="panel-foot"><span class="status-dot"></span><span id="sector-status">ACQUIRING TOPOLOGY</span></div>
+      </section>
+
+      <div id="cluster-markers" aria-label="Orbital sector markers"></div>
+      <div id="node-reticle" hidden aria-hidden="true"><span id="reticle-label"></span></div>
+      <div class="singularity-caption" id="singularity-caption" aria-hidden="true"><span class="caption-rule"></span><p class="eyebrow">THE SINGULARITY</p><p>Thought has a gravitational pull.</p></div>
+
+      <aside id="inspector" class="inspector glass" aria-labelledby="selection-title">
+        <div class="panel-heading"><span class="eyebrow">OBSERVATION DECK</span><span class="reticle" aria-hidden="true">⌖</span></div>
+        <h2 id="selection-title">The whole, connected.</h2>
+        <p id="selection-description">Individual notes become constellations. Their connections trace the space between.</p>
+        <div id="node-details" hidden>
+          <label class="eyebrow node-label" for="node-select">INSPECT AN ANONYMOUS NODE</label>
+          <select id="node-select" aria-label="Inspect an anonymous node"><option value="">Choose an anonymous ID</option></select>
+          <dl id="node-facts" hidden><div><dt>Anonymous ID</dt><dd id="node-id"></dd></div><div><dt>Total connections</dt><dd id="node-degree"></dd></div></dl>
+          <p id="sector-render-count" class="node-sample-note"></p>
+        </div>
+        <div class="interaction-guide" id="interaction-guide"><div><span>↔</span> Drag to orbit</div><div><span>↕</span> Scroll to approach</div><div><span>⊙</span> Select a star to inspect</div></div>
+        <p class="privacy-note">Anonymous IDs. No titles. No content.</p>
+      </aside>
+
+      <div class="loading-notice" id="loading-notice" role="status"><span class="loading-orbit"></span>Resolving the constellation…</div>
+      <div id="fallback" class="fallback glass" hidden><p class="eyebrow">SIGNAL UNAVAILABLE</p><h2 id="fallback-title">The observatory is offline.</h2><p id="fallback-description"></p><button id="retry-button" class="text-button">Try again</button></div>
+      <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+    </main>
+
+    <div class="bottom-bar">
+      <div class="view-status"><span class="status-dot"></span><span id="view-state">LIVE ORBIT</span><span class="view-status-divider">/</span><span id="view-name">ALL SYSTEMS</span></div>
+      <div class="view-controls" role="group" aria-label="View controls"><button id="pause-button" aria-label="Pause motion" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause motion</span></button><span class="control-divider"></span><button id="reset-button"><span aria-hidden="true">↺</span>Reset view</button></div>
+      <div class="render-stat"><span id="render-count">— / —</span><span class="eyebrow">NOTES RENDERED</span></div>
+    </div>
+    <footer><span>THE STRUCTURE REMAINS. THE STORIES STAY PRIVATE.</span><span class="footer-right">TR INGRAM<span>·</span>EVENT HORIZON / 01</span></footer>
+  </div>
+  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Positions and the black hole are artistic, not a physical simulation. The black hole, dust, and background stars are decoration; colored sector stars represent notes. Only real within-sector connections are drawn. A bounded sample keeps the observatory responsive.</p><p>Drag to orbit, scroll or pinch to zoom, and select a sector to isolate it. Use sector buttons and the node selector for keyboard exploration. Escape clears a selection. Motion respects your system’s reduced-motion preference.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
+  <noscript><div class="noscript-notice">Event Horizon needs JavaScript for its 3D observatory. This site contains anonymous connection topology, not note titles or content.</div></noscript>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
