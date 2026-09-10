@@ -126,6 +126,7 @@ export const rayFragment = /* glsl */ `
     float discriminant = b * b - dot(p, p) + DOMAIN * DOMAIN;
     vec3 radiance = vec3(0);
     vec2 noteUv = vec2(-1.0);
+    vec2 noteSlope = vec2(0.0);
     float noteWeight = 0.0;
     float transmission = 1.0;
     float firstDepth = NO_HIT;
@@ -149,7 +150,7 @@ export const rayFragment = /* glsl */ `
 
         // Strongly bent note images: intersect the ray with the real
         // disk exposure AFTER periapsis. Direct foreground stars stay 3D.
-        // Thin-plane approximation deliberately collapses the shallow warp.
+        // Start from a thin plane; the captured mean height corrects it below.
         if (uDiskEnabled > 0.0 && p.y * next.y < 0.0) {
           vec3 hit = mix(p, next, -p.y / (next.y - p.y));
           if (dot(hit, halfVelocity) > 0.0) {
@@ -160,8 +161,13 @@ export const rayFragment = /* glsl */ `
               float highlight = 1.0 + 0.22 * dot(tangent, -normalize(halfVelocity));
               float secondary = smoothstep(0.04, 0.18, 1.0 - dot(initial, normalize(halfVelocity)));
               noteUv = uv;
+              vec3 worldDirection = (uHoleToWorld * vec4(halfVelocity, 0.0)).xyz;
+              float vertical = (worldDirection.y < 0.0 ? -1.0 : 1.0) * max(abs(worldDirection.y), 0.035);
+              noteSlope = clamp(worldDirection.xz / vertical, vec2(-12.0), vec2(12.0));
               // Fade weakly bent primary light; ordinary stars are drawn later.
-              noteWeight = 1.65 * highlight * secondary;
+              // Exposure-grade the finite source footprint as luminous light,
+              // not a dark reflective-looking surface. This is art direction.
+              noteWeight = 3.8 * highlight * secondary;
             }
           }
         }
@@ -202,10 +208,28 @@ export const rayFragment = /* glsl */ `
     vec3 worldEscape = normalize((uHoleToWorld * vec4(normalize(v), 0)).xyz);
     vec3 background = sky(worldEscape); // derivatives evaluated for all pixels
     if (escaped) radiance += transmission * background;
-    // One texture lookup OUTSIDE the integration loop: no divergent texture
-    // fetches on every ray step, and no synthetic fill between note images.
+    // A finite ray-cone footprint filters the ACTUAL exposure, not procedural
+    // gas. Derivatives are evaluated before branching so critical-ray borders
+    // cannot choose an undefined mip. This removes needle-thin sampled rails.
+    vec2 sourceSize = vec2(textureSize(uDiskImage, 0));
+    vec2 sourceDx = dFdx(noteUv) * sourceSize;
+    vec2 sourceDy = dFdy(noteUv) * sourceSize;
+    float footprint = max(dot(sourceDx, sourceDx), dot(sourceDy, sourceDy));
+    float sourceLod = clamp(0.5 * log2(max(footprint, 1.0)), 2.6, 4.5);
+    // Two bounded lookups OUTSIDE integration. The first reads actual
+    // emission-weighted height; the second corrects the plane intersection.
+    // This retains shallow source depth instead of flattening every note into
+    // the same perfectly concentric Einstein ring at an edge-on alignment.
     if (uDiskEnabled > 0.0 && noteWeight > 0.0 && escaped) {
-      radiance += textureLod(uDiskImage, noteUv, 0.5).rgb * noteWeight;
+      // Height must have support beyond the original light footprint, or an
+      // initially empty plane lookup can never discover a displaced source.
+      // A four-texel-wide height mip covers the entire +/-0.08 UV correction.
+      // RGB and signed height are averaged together, keeping their ratio valid.
+      float heightLod = max(sourceLod, log2(max(sourceSize.x, sourceSize.y) * 0.25));
+      vec4 source = textureLod(uDiskImage, noteUv, heightLod);
+      float height = clamp(source.a / max(dot(source.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.00000001), -0.65, 0.65);
+      vec2 liftedUv = noteUv + clamp(noteSlope * height / (2.0 * uDiskExtent), vec2(-0.08), vec2(0.08));
+      radiance += textureLod(uDiskImage, liftedUv, sourceLod).rgb * noteWeight;
     }
     // No reflective surface or light painted into the absorbing center.
     if (captured) radiance = vec3(0.0);

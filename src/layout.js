@@ -1,4 +1,4 @@
-export const SECTOR_COLORS = ['#8bded0', '#ffd18a', '#b6a0ed', '#eea06d', '#d8e9a2', '#eaa2c0', '#92bde9', '#a6d3c1'];
+export const SECTOR_COLORS = ['#b2d6cf', '#f6e2c6', '#c3b6dc', '#dba276', '#d4d4ad', '#d7afb7', '#a5bed4', '#b6ccbf'];
 export const DISK = Object.freeze({ inner: 3.65, outer: 11.8, thickness: 0.48, turns: 7.4, rotation: 0.075, period: 96 });
 const TAU = Math.PI * 2;
 
@@ -41,7 +41,9 @@ export function buildLayout(graph) {
       const arm = Math.floor(rnd() * 3);
       orbits.set(node.id, {
         phase: (index + 0.25 + rnd() * 0.5) / nodes.length,
-        angle: base + arm * TAU / 3 + (rnd() - 0.5) * 0.52,
+        // Broad, seeded flow cross-sections keep real streams without narrow
+        // radial rails turning into perfectly repeated rings in the lens.
+        angle: base + arm * TAU / 3 + (rnd() - 0.5) * 1.65,
         height: (rnd() + rnd() - 1) * DISK.thickness,
       });
     });

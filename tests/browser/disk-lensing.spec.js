@@ -55,11 +55,27 @@ test('actual far-side source light reaches both shadow arcs and follows camera a
           red += r; blue += b; checksum += delta * (x + y * 0.123);
           if (Math.hypot(x - hole.target.width / 2, y - hole.target.height / 2) < 12) center = Math.max(center, r, b);
         }
-        return { upper, lower, red, blue, center, checksum };
+        const sourcePixel = new Uint16Array(4);
+        renderer.readRenderTargetPixels(light.target,
+          Math.floor((0.7 / (2 * light.extent) + 0.5) * light.target.width),
+          Math.floor((-6 / (2 * light.extent) + 0.5) * light.target.height), 1, 1, sourcePixel);
+        const rgba = Array.from(sourcePixel, T.DataUtils.fromHalfFloat);
+        const emission = rgba[0] * 0.2126 + rgba[1] * 0.7152 + rgba[2] * 0.0722;
+        return { upper, lower, red, blue, center, checksum, sourceHeight: emission > 1e-8 ? rgba[3] / emission : 0 };
       };
       geometry.attributes.aColor.setXYZ(0, 1, 0, 0); geometry.attributes.aColor.needsUpdate = true;
       camera.position.set(0, 3, 30); camera.lookAt(0, 0, 0);
       const original = sample();
+      const corePixels = new Uint16Array(3 * 3 * 4);
+      const sx = Math.floor((0.7 / (2 * light.extent) + 0.5) * light.target.width);
+      const sy = Math.floor((-6 / (2 * light.extent) + 0.5) * light.target.height);
+      renderer.readRenderTargetPixels(light.target, sx - 1, sy - 1, 3, 3, corePixels);
+      const sourcePeak = Math.max(...Array.from(corePixels).filter((_, i) => i % 4 === 0).map(T.DataUtils.fromHalfFloat));
+      geometry.attributes.position.setY(0, 0.35); geometry.attributes.position.needsUpdate = true;
+      const raised = sample();
+      geometry.attributes.position.setY(0, -0.35); geometry.attributes.position.needsUpdate = true;
+      const lowered = sample();
+      geometry.attributes.position.setY(0, 0); geometry.attributes.position.needsUpdate = true;
       geometry.attributes.aColor.setXYZ(0, 0, 0, 1); geometry.attributes.aColor.needsUpdate = true;
       const blue = sample();
       camera.position.set(9, 12, 25); camera.lookAt(0, 0, 0);
@@ -72,7 +88,20 @@ test('actual far-side source light reaches both shadow arcs and follows camera a
       point.visible = false;
       const empty = sample();
       point.visible = true;
-      receipts.push({ quality, original, blue, moved, straight, empty, glError: renderer.getContext().getError() });
+      // Production-size isolated stars must be discoverable at the displaced
+      // intersection, not merely disappear when the first plane lookup is empty.
+      geometry.attributes.aColor.setXYZ(0, 1, 0, 0); geometry.attributes.aColor.needsUpdate = true;
+      geometry.attributes.aSize.setX(0, 6.5); geometry.attributes.aSize.needsUpdate = true;
+      camera.position.set(0, 0.15, 30); camera.lookAt(0, 0, 0);
+      const grazingFlat = sample();
+      geometry.attributes.position.setY(0, 0.35); geometry.attributes.position.needsUpdate = true;
+      const grazingRaised = sample();
+      geometry.attributes.position.setY(0, -0.35); geometry.attributes.position.needsUpdate = true;
+      const grazingLowered = sample();
+      point.visible = false; const grazingEmpty = sample(); point.visible = true;
+      geometry.attributes.position.setY(0, 0); geometry.attributes.position.needsUpdate = true;
+      geometry.attributes.aSize.setX(0, 30); geometry.attributes.aSize.needsUpdate = true;
+      receipts.push({ quality, sourcePeak, original, raised, lowered, blue, moved, straight, empty, grazingFlat, grazingRaised, grazingLowered, grazingEmpty, glError: renderer.getContext().getError() });
       light.dispose(); hole.dispose();
     }
     geometry.dispose(); point.material.dispose(); trail.geometry.dispose(); trail.material.dispose(); renderer.dispose();
@@ -81,6 +110,15 @@ test('actual far-side source light reaches both shadow arcs and follows camera a
   expect(result.supported, 'actual radiance must be integrated into the ray pass').toBe(true);
   writeFileSync('test-results/disk-lensing-source-identity.json', JSON.stringify(result, null, 2));
   for (const r of result.receipts) {
+    expect(r.sourcePeak, `${r.quality}: compact HDR stellar cores, not flat beads`).toBeGreaterThan(3);
+    expect(Math.abs(r.raised.checksum - r.original.checksum), `${r.quality}: the actual note height changes its lensed image`).toBeGreaterThan(0.1);
+    expect(Math.abs(r.lowered.checksum - r.original.checksum), `${r.quality}: signed below-plane height is retained`).toBeGreaterThan(0.1);
+    expect(Math.abs(r.lowered.checksum - r.raised.checksum), `${r.quality}: opposite source heights are not flattened together`).toBeGreaterThan(0.1);
+    expect(r.raised.sourceHeight, `${r.quality}: positive signed HDR height moment`).toBeCloseTo(0.35, 2);
+    expect(r.lowered.sourceHeight, `${r.quality}: negative signed HDR height moment`).toBeCloseTo(-0.35, 2);
+    const grazingEnergy = r.grazingFlat.red - r.grazingEmpty.red;
+    expect(r.grazingRaised.red - r.grazingEmpty.red, `${r.quality}: off-plane upper source is not erased at grazing incidence`).toBeGreaterThan(grazingEnergy * 0.1);
+    expect(r.grazingLowered.red - r.grazingEmpty.red, `${r.quality}: off-plane lower source is not erased at grazing incidence`).toBeGreaterThan(grazingEnergy * 0.1);
     expect(r.original.upper, `${r.quality}: far-side upper image`).toBeGreaterThan(0);
     expect(r.original.lower, `${r.quality}: far-side lower image`).toBeGreaterThan(0);
     expect(r.original.center).toBe(0);

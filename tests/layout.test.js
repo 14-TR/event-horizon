@@ -32,6 +32,20 @@ test('every actual note maps exactly once into a shared thin 3D spiral disk, not
   assert.deepEqual(graph, before, 'the full valid graph remains unchanged');
 });
 
+test('populous streams have broad, irregular cross-sections rather than three narrow light rails', () => {
+  const layout = buildLayout(parseGraph(raw));
+  for (const cluster of layout.clusters.filter(c => c.count > 100)) {
+    const nodes = layout.nodes.filter(n => n.cluster === cluster.id);
+    // The threefold harmonic measures how tightly the actual source notes
+    // collapse onto three evenly spaced spiral rails after unwinding the flow.
+    const real = nodes.reduce((sum, n) => sum + Math.cos(3 * n.orbit.angle), 0) / nodes.length;
+    const imaginary = nodes.reduce((sum, n) => sum + Math.sin(3 * n.orbit.angle), 0) / nodes.length;
+    const coherence = Math.hypot(real, imaginary);
+    assert.ok(coherence < 0.65, `${cluster.id}: narrow source rails create concentric lensed bands (${coherence})`);
+    assert.ok(coherence > 0.08, 'streams retain direction rather than becoming uniform random dust');
+  }
+});
+
 test('a singleton sector has a real star at its marker within the same disk', () => {
   const layout = buildLayout({ nodes: [{ id: 'n000001', cluster: 0 }], clusters: [{ id: 0, count: 1 }], edges: [] });
   assert.deepEqual(layout.nodes[0].position, layout.clusters[0].center);

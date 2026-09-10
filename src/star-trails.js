@@ -3,7 +3,6 @@ import { DISK, diskPosition } from './layout.js';
 
 // Detail per actual node, never a sampled subset of stars.
 export const TRAIL_BUDGETS = Object.freeze({ mobile: 3, desktop: 5, cinematic: 7 });
-const EXPOSURE_SECONDS = 0.85;
 
 /** Bounded orbital exposures evaluated from the same actual-note trajectories.
  * Analytic history makes a reduced-motion opening equally complete and luminous.
@@ -15,6 +14,7 @@ export class StarTrails {
     const colors = new Map(layout.clusters.map(cluster => [cluster.id, new THREE.Color(cluster.color)]));
     this.entries = layout.nodes.map(node => ({
       node, color: colors.get(node.cluster), history: [],
+      exposure: 0.24 + 0.24 * ((Number(node.id.slice(1)) * 0.754877666) % 1),
       samples: Array.from({ length: this.segments }, () => [0, 0, 0]),
     }));
     this.maxLength = quality === 'mobile' ? 1.2 : 1.5;
@@ -22,7 +22,7 @@ export class StarTrails {
     const geometry = new THREE.BufferGeometry();
     for (const name of ['position', 'color']) geometry.setAttribute(name, new THREE.BufferAttribute(new Float32Array(layout.nodes.length * this.segments * 6), 3).setUsage(THREE.DynamicDrawUsage));
     geometry.setDrawRange(0, 0);
-    this.mesh = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.62, blending: THREE.AdditiveBlending, depthTest: true, depthWrite: false }));
+    this.mesh = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.36, blending: THREE.AdditiveBlending, depthTest: true, depthWrite: false }));
     this.mesh.name = 'actual-note-trails';
     this.mesh.frustumCulled = false;
   }
@@ -39,7 +39,7 @@ export class StarTrails {
       const cycle = Math.floor(orbit.phase - time / DISK.period);
       let from = entry.node.position, length = 0;
       for (let index = 0; index < this.segments; index++) {
-        const prior = time - (index + 1) * EXPOSURE_SECONDS / this.segments;
+        const prior = time - (index + 1) * entry.exposure / this.segments;
         if (Math.floor(orbit.phase - prior / DISK.period) !== cycle) break;
         const to = diskPosition(orbit, prior, entry.samples[index]);
         length += Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);

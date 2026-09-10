@@ -12,14 +12,23 @@ export const pointVertex = /* glsl */ `
     gl_Position = projectionMatrix * mv;
   }
 `;
+
+// Both the direct view and HDR capture use this identical optical profile.
+export const stellarLight = /* glsl */ `
+  vec4 stellarLight(vec2 coordinate, vec3 color, float opacity) {
+    float d = length(coordinate - 0.5) * 2.0;
+    if (d > 1.0) discard;
+    float core = exp(-d * d * 90.0);
+    float shoulder = exp(-d * d * 18.0);
+    float halo = exp(-d * d * 3.5);
+    float edge = 1.0 - smoothstep(0.72, 1.0, d);
+    return vec4(color * (4.0 * core + 0.62 * shoulder + 0.07 * halo), edge * opacity);
+  }
+`;
+
 export const pointFragment = /* glsl */ `
   uniform float uOpacity;
   varying vec3 vColor;
-  void main() {
-    float d = length(gl_PointCoord - 0.5) * 2.0;
-    if (d > 1.0) discard;
-    float core = exp(-d * d * 38.0);
-    float glow = exp(-d * d * 5.0) * 0.34;
-    gl_FragColor = vec4(vColor * (1.0 + core * 0.6), (core + glow) * uOpacity);
-  }
+  ${stellarLight}
+  void main() { gl_FragColor = stellarLight(gl_PointCoord, vColor, uOpacity); }
 `;

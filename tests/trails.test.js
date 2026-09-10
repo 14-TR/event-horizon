@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseGraph } from '../src/graph.js';
-import { buildLayout, DISK } from '../src/layout.js';
+import { buildLayout, DISK, diskPosition } from '../src/layout.js';
 import { createInfall } from '../src/motion.js';
 import { StarTrails } from '../src/star-trails.js';
 
@@ -26,6 +26,20 @@ test('every real note supplies bounded stellar light trails even in the initial 
     assert.equal(trails.mesh.material.depthWrite, false);
     trails.dispose();
   }
+});
+
+test('stellar exposures stay shorter than half a second instead of joining into luminous wires', () => {
+  const layout = buildLayout(graph), infall = createInfall(layout), trails = new StarTrails(layout);
+  const time = 8;
+  infall(time); trails.update(time);
+  for (const entry of trails.entries) {
+    if (!entry.history.length || Math.floor(entry.node.orbit.phase - time / DISK.period) !== Math.floor(entry.node.orbit.phase - (time - 0.5) / DISK.period)) continue;
+    const limit = diskPosition(entry.node.orbit, time - 0.5);
+    const last = entry.history.at(-1);
+    assert.ok(Math.hypot(last[0], last[2]) <= Math.hypot(limit[0], limit[2]) + 1e-7, 'no real-note exposure exceeds half a second');
+  }
+  assert.ok(trails.mesh.material.opacity <= 0.4, 'the luminous stars lead; trails do not become continuous wire rails');
+  trails.dispose();
 });
 
 test('per-note recycling truncates exposure without connecting inner and outer radii', () => {

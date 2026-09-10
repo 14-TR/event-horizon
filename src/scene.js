@@ -132,7 +132,9 @@ export class Observatory {
       for (const node of nodes) {
         p.push(...node.position);
         c.push(color.r, color.g, color.b);
-        s.push(nodes.length <= 4 ? 16 : 10 + (Number(node.id.slice(-3)) % 9 === 0 ? 5 : 0));
+        // Stable stellar hierarchy, unrelated to degree or private meaning.
+        const magnitude = (Number(node.id.slice(1)) * 0.61803398875) % 1;
+        s.push(nodes.length <= 4 ? 14 : 6.5 + 7.5 * Math.pow(magnitude, 2));
       }
       const points = this.points(p, c, s);
       points.userData.nodes = nodes;

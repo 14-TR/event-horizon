@@ -86,6 +86,9 @@ test('all quality levels build a one-to-one GPU point buffer for the entire actu
     });
     assert.deepEqual(drawn.sort(), graph.nodes.map(n => n.id).sort());
     assert.equal(new Set(drawn).size, 1675);
+    const sizes = [...view.clusterObjects.values()].flatMap(({ points }) => [...points.geometry.attributes.aSize.array]);
+    assert.ok(new Set(sizes.map(size => size.toFixed(2))).size > 80, 'the actual stars need a continuous luminosity hierarchy, not two identical bead sizes');
+    assert.ok(sizes.every(size => size >= 6 && size <= 16), 'stellar footprints remain bounded for direct and lensed light');
     assert.equal(view.host.dataset.noteStars, '1675', 'expose the actual buffer population, not a promised count');
     for (const { points, line } of view.clusterObjects.values()) {
       points.geometry.dispose(); points.material.dispose(); line.geometry.dispose(); line.material.dispose();

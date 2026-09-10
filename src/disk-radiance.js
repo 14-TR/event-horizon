@@ -1,17 +1,19 @@
 import * as THREE from 'three';
 import { DISK } from './layout.js';
-import { pointFragment } from './shaders.js';
+import { stellarLight } from './shaders.js';
 
 export const DISK_IMAGE_SIZES = Object.freeze({ mobile: 512, desktop: 768, cinematic: 1024 });
 const extent = DISK.outer + 0.7; // Includes sprite footprints and bounded trail ends.
 const flatPosition = /* glsl */ `
   vec4 world = modelMatrix * vec4(position, 1.0);
   gl_Position = vec4(world.xz / uExtent, 0.0, 1.0);
+  vHeight = world.y;
 `;
 
 /** A linear-HDR exposure of the ACTUAL point/trail buffers onto world XZ.
  * Borrowed geometry stays live; copies are light only, never graph/picking objects.
- * Flattening the shallow disk and fixing sprite footprints is an approximation.
+ * Alpha stores emission-weighted actual height for a shallow-disk correction.
+ * A single mean height and finite sprite footprints remain approximations.
  */
 export class DiskRadiance {
   constructor(points, trailSource, quality = 'desktop') {
@@ -34,14 +36,26 @@ export class DiskRadiance {
         uniform float uExtent;
         uniform float uResolution;
         varying vec3 vColor;
+        varying float vHeight;
         void main() {
           vColor = aColor;
           gl_PointSize = max(1.0, aSize * 0.035 * uResolution / (2.0 * uExtent));
           ${flatPosition}
         }
       `,
-      fragmentShader: pointFragment,
-      transparent: true, blending: THREE.AdditiveBlending,
+      fragmentShader: /* glsl */ `
+        uniform float uOpacity;
+        varying vec3 vColor;
+        varying float vHeight;
+        ${stellarLight}
+        void main() {
+          vec4 light = stellarLight(gl_PointCoord, vColor, uOpacity);
+          vec3 emission = light.rgb * light.a;
+          gl_FragColor = vec4(emission, dot(emission, vec3(0.2126, 0.7152, 0.0722)) * vHeight);
+        }
+      `,
+      transparent: true, blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
       depthTest: false, depthWrite: false, toneMapped: false,
     });
     this.trailMaterial = new THREE.ShaderMaterial({
@@ -50,14 +64,20 @@ export class DiskRadiance {
         attribute vec3 color;
         uniform float uExtent;
         varying vec3 vColor;
+        varying float vHeight;
         void main() { vColor = color; ${flatPosition} }
       `,
       fragmentShader: /* glsl */ `
         uniform float uOpacity;
         varying vec3 vColor;
-        void main() { gl_FragColor = vec4(vColor, uOpacity); }
+        varying float vHeight;
+        void main() {
+          vec3 emission = vColor * uOpacity;
+          gl_FragColor = vec4(emission, dot(emission, vec3(0.2126, 0.7152, 0.0722)) * vHeight);
+        }
       `,
-      transparent: true, blending: THREE.AdditiveBlending,
+      transparent: true, blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
       depthTest: false, depthWrite: false, toneMapped: false,
     });
     this.entries = points.map(source => {
