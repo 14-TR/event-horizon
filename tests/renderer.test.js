@@ -51,6 +51,7 @@ test('observatory installs a bounded world-space ray renderer without decorative
   view.scene = new Scene();
   view.addBlackHole();
   assert.ok(view.blackHole?.anchor, 'world-space BlackHoleRenderer replaces the billboard');
+  assert.equal(view.blackHole.uniforms.uDust?.value, 0, 'the note-disk is not covered by a procedural gas disk');
   assert.equal(view.addStars, undefined, 'no duplicate unlensed sky or orange dust');
   view.blackHole.resize(1440, 1000, 1.75);
   assert.ok(view.blackHole.target.width * view.blackHole.target.height <= 1100000);
@@ -63,4 +64,32 @@ test('observatory installs a bounded world-space ray renderer without decorative
   view.blackHole.update(camera, 4);
   assert.ok(view.blackHole.anchor.quaternion.equals(fixed));
   view.blackHole.dispose();
+});
+
+test('all quality levels build a one-to-one GPU point buffer for the entire actual graph', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseGraph } = await import('../src/graph.js');
+  const graph = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
+  const snapshot = structuredClone(graph);
+  for (const quality of ['mobile', 'desktop', 'cinematic']) {
+    const view = Object.create(Observatory.prototype);
+    view.quality = quality;
+    view.graph = graph; view.layout = buildLayout(graph);
+    view.host = { dataset: {} };
+    view.clusterObjects = new Map(); view.orbital = new Group();
+    view.renderer = { getPixelRatio: () => 1 };
+    view.addConstellations();
+    const drawn = [...view.clusterObjects.values()].flatMap(({ points }) => {
+      assert.equal(points.geometry.attributes.position.count, points.userData.nodes.length);
+      assert.deepEqual(points.geometry.attributes.position.array, new Float32Array(points.userData.nodes.flatMap(n => n.position)), 'every GPU point is at its actual node coordinate');
+      return points.userData.nodes.map(n => n.id);
+    });
+    assert.deepEqual(drawn.sort(), graph.nodes.map(n => n.id).sort());
+    assert.equal(new Set(drawn).size, 1675);
+    assert.equal(view.host.dataset.noteStars, '1675', 'expose the actual buffer population, not a promised count');
+    for (const { points, line } of view.clusterObjects.values()) {
+      points.geometry.dispose(); points.material.dispose(); line.geometry.dispose(); line.material.dispose();
+    }
+  }
+  assert.deepEqual(graph, snapshot, 'no quality preset changes valid topology');
 });

@@ -19,6 +19,7 @@ export const rayFragment = /* glsl */ `
   uniform float uWorldScale;
   uniform float uLensing;
   uniform float uStars;
+  uniform float uDust;
 
   const float DOMAIN = 36.0;
   const float INNER = 3.05;
@@ -143,7 +144,9 @@ export const rayFragment = /* glsl */ `
 
         // Intersect the whole integration segment with a finite world-space
         // slab. This avoids missing a thin disk with larger mobile steps.
-        if (min(p.y, next.y) < THICKNESS && max(p.y, next.y) > -THICKNESS) {
+        // Optional supporting dust only. The observatory disables it: every
+        // luminous disk star is a real note, rendered directly after this pass.
+        if (uDust > 0.0 && min(p.y, next.y) < THICKNESS && max(p.y, next.y) > -THICKNESS) {
           float dy = next.y - p.y;
           float enter = 0.0, leave = 1.0;
           if (abs(dy) > 0.00001) {
@@ -158,13 +161,9 @@ export const rayFragment = /* glsl */ `
               vec4 material = disk(samplePoint, -normalize(halfVelocity));
               float path = length(next - p) * (leave - enter);
               float verticalProfile = 1.0 - smoothstep(THICKNESS * 0.2, THICKNESS, abs(samplePoint.y));
-              float opacity = 1.0 - exp(-material.a * verticalProfile * path / (2.0 * THICKNESS) * 1.8);
+              float opacity = min(0.04, 1.0 - exp(-material.a * verticalProfile * path / (2.0 * THICKNESS) * uDust));
               radiance += transmission * opacity * material.rgb;
-              transmission *= 1.0 - opacity;
-              if (firstDepth == NO_HIT && opacity > 0.06) {
-                firstDepth = max(0.001, dot(samplePoint - origin, initial) * uWorldScale);
-              }
-              if (transmission < 0.012) { break; }
+              // Emissive support never supplies an opaque foreground depth.
             }
           }
         }

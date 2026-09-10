@@ -37,26 +37,26 @@
       </section>
 
       <section id="sectors-panel" class="sectors-panel glass" aria-labelledby="sectors-title">
-        <div class="panel-heading"><span class="eyebrow">ORBITAL SYSTEMS</span><span id="sector-fraction" class="eyebrow">—</span></div>
-        <h2 id="sectors-title">Constellations</h2>
-        <p class="panel-description">Select a sector. Follow a connection.</p>
-        <nav id="sector-list" aria-label="Constellations" tabindex="-1"></nav>
+        <div class="panel-heading"><span class="eyebrow">STELLAR ACCRETION</span><span id="sector-fraction" class="eyebrow">—</span></div>
+        <h2 id="sectors-title">Disk streams</h2>
+        <p class="panel-description">Isolate a sector within the shared disk.</p>
+        <nav id="sector-list" aria-label="Disk streams" tabindex="-1"></nav>
         <div class="panel-foot"><span class="status-dot"></span><span id="sector-status">ACQUIRING TOPOLOGY</span></div>
       </section>
 
       <div id="cluster-markers" aria-label="Orbital sector markers"></div>
       <div id="node-reticle" hidden aria-hidden="true"><span id="reticle-label"></span></div>
-      <div class="singularity-caption" id="singularity-caption" aria-hidden="true"><span class="caption-rule"></span><p class="eyebrow">THE SINGULARITY</p><p>Thought has a gravitational pull.</p></div>
+      <div class="singularity-caption" id="singularity-caption" aria-hidden="true"><span class="caption-rule"></span><p class="eyebrow">NOTES, IN ORBIT</p><p>One shared disk. Every note included.</p></div>
 
       <aside id="inspector" class="inspector glass" aria-labelledby="selection-title">
         <div class="panel-heading"><span class="eyebrow">OBSERVATION DECK</span><span class="reticle" aria-hidden="true">⌖</span></div>
         <h2 id="selection-title">The whole, connected.</h2>
-        <p id="selection-description">Individual notes become constellations. Their connections trace the space between.</p>
+        <p id="selection-description">Every point of light in the disk is a note. Isolate a colored stream to explore its connections.</p>
         <div id="node-details" hidden>
           <label class="eyebrow node-label" for="node-select">INSPECT AN ANONYMOUS NODE</label>
           <select id="node-select" aria-label="Inspect an anonymous node"><option value="">Choose an anonymous ID</option></select>
           <dl id="node-facts" hidden><div><dt>Anonymous ID</dt><dd id="node-id"></dd></div><div><dt>Total connections</dt><dd id="node-degree"></dd></div></dl>
-          <p id="sector-render-count" class="node-sample-note"></p>
+          <p id="sector-render-count" class="node-population-note"></p>
         </div>
         <div class="interaction-guide" id="interaction-guide"><div><span>↔</span> Drag to orbit</div><div><span>↕</span> Scroll to approach</div><div><span>⊙</span> Select a star to inspect</div></div>
         <p class="privacy-note">Anonymous IDs. No titles. No content.</p>
@@ -84,7 +84,7 @@
         <button data-flight="down" aria-label="Fly down">−<small>DOWN</small></button>
         <button data-flight="up" aria-label="Fly up">+<small>UP</small></button>
       </div>
-      <div class="loading-notice" id="loading-notice" role="status"><span class="loading-orbit"></span>Resolving the constellation…</div>
+      <div class="loading-notice" id="loading-notice" role="status"><span class="loading-orbit"></span>Resolving the stellar disk…</div>
       <div id="fallback" class="fallback glass" hidden><p class="eyebrow">SIGNAL UNAVAILABLE</p><h2 id="fallback-title">The observatory is offline.</h2><p id="fallback-description"></p><button id="retry-button" class="text-button">Try again</button></div>
       <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
     </main>
@@ -92,11 +92,11 @@
     <div class="bottom-bar">
       <div class="view-status"><span class="status-dot"></span><span id="view-state">LIVE ORBIT</span><span class="view-status-divider">/</span><span id="view-name">ALL SYSTEMS</span></div>
       <div class="view-controls" role="group" aria-label="View controls"><button id="pause-button" aria-label="Pause motion" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause motion</span></button><span class="control-divider"></span><button id="reset-button"><span aria-hidden="true">↺</span>Reset view</button></div>
-      <div class="render-stat"><span id="render-count">— / —</span><span class="eyebrow">NOTES RENDERED</span></div>
+      <div class="render-stat"><span id="render-count">— / —</span><span class="eyebrow">NOTES IN DISK</span></div>
     </div>
     <footer><span>THE STRUCTURE REMAINS. THE STORIES STAY PRIVATE.</span><span class="footer-right">TR INGRAM<span>·</span>EVENT HORIZON / 01</span></footer>
   </div>
-  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Colored stars are actual sampled notes spiraling inward through 3D space. Each sector returns to its outer orbit on a repeating visual loop: no notes or connections are deleted. The paths and black hole are artistic, not a physical simulation. The turbulent gas and lensed background sky are artwork, not extra notes. Short colored trails follow actual note positions and clear when a sector recycles. Only real within-sector connections are drawn, with endpoints following the moving notes.</p><p>In Orbit, drag to orbit and scroll or pinch to zoom. Select a sector to isolate and follow it. In Fly, use WASD to move, Q/E for down/up, and drag to look; touch users can hold the six thrust buttons. Selecting a sector returns to tracking Orbit. Reset view restores the home camera. Cinematic view hides the HUD; its persistent exit button or Escape restores it. Render quality separately offers Mobile, Desktop and Cinematic budgets. Escape otherwise clears a selection. Pause and reduced motion freeze stars, trails and gas; deliberate camera controls still work.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
+  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Every colored star in the disk is an actual note. All notes are included on desktop and mobile: sectors form interleaved spiral streams within one thin, three-dimensional accretion disk. Notes rotate inward and wrap individually to the outer edge, always outside the absorbing horizon. No note or connection is deleted, and no invented notes fill the disk.</p><p>The dim background sky is separate decorative artwork. Its camera-dependent lensing uses an approximation, not a full gravity simulation. Note-stars are ordinary, directly rendered 3D objects: their images are <strong>not physically lensed</strong>. Procedural gas is disabled. Short colored trails are bounded exposures of those same notes along their actual visual trajectories, including in the frozen opening. Isolating a sector reveals only its stream and real within-sector connections. Cross-sector connections remain in the data and total neighbor counts. The bottom count reports notes included in the disk, not pixels currently visible through the horizon or camera.</p><p>In Orbit, drag to orbit and scroll or pinch to zoom. Select a sector to isolate its stream. In Fly, use WASD to move, Q/E for down/up, and drag to look; touch users can hold the six thrust buttons. Selecting a sector returns to Orbit. Reset view restores the home camera and all sectors. Cinematic view hides the HUD; its persistent exit button or Escape restores it. Render quality changes ray and trail detail, never note coverage. Escape otherwise clears a selection. Pause and reduced motion freeze stars and trails; deliberate camera controls still work.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
   <noscript><div class="noscript-notice">Event Horizon needs JavaScript for its 3D observatory. This site contains anonymous connection topology, not note titles or content.</div></noscript>
   <script type="module" src="/src/main.js"></script>
 </body>

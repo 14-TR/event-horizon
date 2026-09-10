@@ -16,8 +16,8 @@ test('real public topology has truthful counts and discoverable tiny sectors', a
   await expect(page.locator('#notes-total')).toHaveText(fmt(raw.nodes.length));
   await expect(page.locator('#links-total')).toHaveText(fmt(raw.edges.length));
   await expect(page.locator('.sector-button')).toHaveCount(raw.clusters.length);
-  const visible = Math.min(1800, raw.clusters.reduce((sum, c) => sum + Math.min(260, c.count), 0));
-  await expect(page.locator('#render-count')).toHaveText(`${fmt(visible)} / ${fmt(raw.nodes.length)}`);
+  await expect(page.locator('#render-count')).toHaveText(`${fmt(raw.nodes.length)} / ${fmt(raw.nodes.length)}`);
+  await expect(page.locator('#sector-status')).toHaveText('ALL NOTES FORM THE DISK');
   await page.screenshot({ path: 'test-results/real-topology-desktop.png', fullPage: true });
   const smallest = [...raw.clusters].sort((a, b) => a.count - b.count)[0];
   await page.locator(`.sector-button[data-cluster="${smallest.id}"]`).click();
@@ -34,6 +34,7 @@ test('real mobile observatory stays in bounds and exposes the inspector and priv
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
+  await expect(page.locator('#render-count')).toHaveText(`${fmt(raw.nodes.length)} / ${fmt(raw.nodes.length)}`);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/real-topology-mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'About this observatory' }).click();

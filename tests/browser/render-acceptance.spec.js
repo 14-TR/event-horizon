@@ -66,7 +66,8 @@ test.describe('combined real topology high-DPI visual acceptance', () => {
     };
     await shot('cinematic');
     await drag(750, 390, 0, 365); await shot('above');
-    await home(); await drag(750, 490, 0, -64); await shot('edge');
+    // Home elevation is atan2(16, 29); OrbitControls uses 2π * 0.45 per canvas height.
+    await home(); await drag(750, 490, 0, -178.312233129); await shot('edge');
     await home(); await drag(160, 490, 1100, 0); await shot('reverse');
     await home(); await drag(750, 650, 0, -300); await shot('below');
     await home();
@@ -107,7 +108,9 @@ test.describe('mobile high-DPI visual acceptance', () => {
     const host = page.locator('#observatory');
     await expect(host).toHaveAttribute('data-quality', 'mobile');
     expect(Number(await host.getAttribute('data-ray-pixels'))).toBeLessThanOrEqual(340000);
-    expect(Number(await host.getAttribute('data-trail-stars'))).toBeLessThanOrEqual(96);
+    await expect(host).toHaveAttribute('data-note-stars', '1675');
+    await expect(host).toHaveAttribute('data-trail-stars', '1675');
+    expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(1675 * 3);
     const caption = page.locator('#singularity-caption');
     if (await caption.isVisible()) {
       const text = await caption.boundingBox(), panel = await page.locator('#sectors-panel').boundingBox();

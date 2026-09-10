@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildLayout } from '../src/layout.js';
+import { buildLayout, DISK } from '../src/layout.js';
+import { readFileSync } from 'node:fs';
+import { parseGraph } from '../src/graph.js';
 import * as THREE from 'three';
 import { Observatory } from '../src/scene.js';
 import { createInfall } from '../src/motion.js';
@@ -11,30 +13,38 @@ const graph = {
   edges: [['n000001', 'n000002']],
 };
 
-test('actual note coordinates spiral inward in three dimensions and recycle without losing topology', async () => {
-  const { createInfall } = await import('../src/motion.js').catch(() => ({}));
-  assert.equal(typeof createInfall, 'function', 'time-driven note infall is implemented');
-  const layout = buildLayout(graph);
+test('all actual notes rotate inward inside the same thin disk and recycle individually without losing topology', () => {
+  const actual = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
+  const before = structuredClone(actual), layout = buildLayout(actual), update = createInfall(layout);
+  update(0);
   const initial = structuredClone(layout.nodes);
-  const update = createInfall(layout);
+  const references = [...layout.nodes];
   update(8);
+  let wrapped = 0;
   for (const [i, node] of layout.nodes.entries()) {
-    assert.equal(node.id, initial[i].id);
-    assert.equal(node.cluster, initial[i].cluster);
-    assert.ok(Math.hypot(...node.position) < Math.hypot(...initial[i].position) - 1);
-    assert.ok(node.position.every((v, axis) => v !== initial[i].position[axis]));
-    const [x, y] = initial[i].position;
-    assert.ok(Math.abs(x * node.position[1] - y * node.position[0]) > 1, 'infall turns rather than only shrinking');
+    assert.equal(node, references[i], 'never replace or remove the actual node');
+    const r = n => Math.hypot(n.position[0], n.position[2]);
+    if (node.cycle !== initial[i].cycle) { wrapped++; assert.ok(r(node) > r(initial[i])); }
+    else assert.ok(r(node) < r(initial[i]), 'each non-recycling note travels inward');
+    assert.ok(node.position.every((v, axis) => v !== initial[i].position[axis]), 'motion is truly 3D');
   }
+  assert.ok(wrapped > 0 && wrapped < actual.nodes.length / 5, 'staggered recycling never empties a stream');
   const atEight = structuredClone(layout);
   update(8);
   assert.deepEqual(layout, atEight, 'a frozen simulation clock freezes positions');
-  update(42);
-  assert.deepEqual(layout.nodes, initial, 'the same anonymous notes reappear after a visual cycle');
-  update(42008);
-  assert.ok(layout.nodes.every(node => node.position.every(Number.isFinite)));
-  assert.equal(layout.nodes.length, graph.nodes.length);
-  assert.deepEqual(graph.edges, [['n000001', 'n000002']]);
+  for (const time of [24, 42, 70, 96, 192.1, 42008, -1]) {
+    update(time);
+    assert.equal(layout.nodes.length, 1675);
+    for (const node of layout.nodes) {
+      const [x, y, z] = node.position;
+      assert.ok(node.position.every(Number.isFinite));
+      assert.ok(Math.hypot(x, z) >= DISK.inner && Math.hypot(x, z) <= DISK.outer);
+      assert.ok(Math.abs(y) < 0.65, 'no inflating clouds or vertical escape during infall');
+    }
+    const azimuths = new Set(layout.nodes.map(n => Math.floor((Math.atan2(n.position[2], n.position[0]) + Math.PI) * 6 / Math.PI)));
+    assert.equal(azimuths.size, 12, 'the disk stays populated around its entire circumference');
+  }
+  assert.deepEqual(actual, before, 'IDs, full links and membership remain unchanged');
 });
 
 test('drawn stars, real edge endpoints, picking and sector centers share the moving coordinates', () => {

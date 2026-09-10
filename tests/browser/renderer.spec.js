@@ -39,15 +39,16 @@ for (const failure of ['missing-float-extension', 'startup-shader', 'runtime-sha
   });
 }
 
-test('actual-star trails are bounded, pause exactly and clear on home reset', async ({ page }) => {
+test('all-node orbital exposures are bounded, pause exactly and rebuild coherently on quality/reset', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
   const host = page.locator('#observatory');
   await expect(host).toHaveAttribute('data-renderer', 'webgl');
-  await expect(host).toHaveAttribute('data-trail-segments', '0');
+  await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(1675);
   const notes = await page.locator('#render-count').textContent();
   await page.getByLabel('Render quality').selectOption('mobile');
-  expect(Number(await host.getAttribute('data-trail-stars'))).toBeLessThanOrEqual(96);
+  await expect(host).toHaveAttribute('data-trail-stars', '1675');
+  await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(1675);
   await page.getByRole('button', { name: 'Resume motion', exact: true }).click();
   await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Pause motion', exact: true }).click();
@@ -55,9 +56,9 @@ test('actual-star trails are bounded, pause exactly and clear on home reset', as
   const stopped = await frame();
   await page.waitForTimeout(200);
   expect((await frame()).equals(stopped)).toBe(true);
-  expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(96 * 4);
+  expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(1675 * 3);
   await page.getByRole('button', { name: 'Reset view', exact: true }).click();
-  await expect(host).toHaveAttribute('data-trail-segments', '0');
+  expect((await frame()).equals(stopped), 'home keeps the same frozen orbital exposure').toBe(true);
   await expect(page.locator('#render-count')).toHaveText(notes);
 });
 

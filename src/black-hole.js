@@ -29,7 +29,7 @@ export class BlackHoleRenderer {
       uHoleToWorld: { value: new THREE.Matrix4() },
       uWorldScale: { value: horizonRadius },
       uTime: { value: 0 }, uStepScale: { value: this.settings.stepScale },
-      uLensing: { value: 1 }, uStars: { value: 1 },
+      uLensing: { value: 1 }, uStars: { value: 0.28 }, uDust: { value: 0 },
       uImage: { value: this.target.texture },
       uTexel: { value: new THREE.Vector2(1, 1) },
       uExposure: { value: exposure }, uGlow: { value: glow },

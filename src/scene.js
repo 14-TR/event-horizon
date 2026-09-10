@@ -44,7 +44,7 @@ export class Observatory {
     this.controls.rotateSpeed = 0.45;
     this.controls.zoomSpeed = 0.7;
     this.controls.addEventListener('start', () => { this.flight = null; });
-    this.homePosition = new THREE.Vector3(0, 5.6, 30);
+    this.homePosition = new THREE.Vector3(0, 16, 29);
     this.homeTarget = new THREE.Vector3(0, 0, 0);
     this.camera.position.copy(this.homePosition);
     this.controls.target.copy(this.homeTarget);
@@ -122,7 +122,7 @@ export class Observatory {
       for (const node of nodes) {
         p.push(...node.position);
         c.push(color.r, color.g, color.b);
-        s.push(nodes.length <= 4 ? 16 : 5 + (Number(node.id.slice(-3)) % 9 === 0 ? 5 : 0));
+        s.push(nodes.length <= 4 ? 16 : 10 + (Number(node.id.slice(-3)) % 9 === 0 ? 5 : 0));
       }
       const points = this.points(p, c, s);
       points.userData.nodes = nodes;
@@ -132,11 +132,13 @@ export class Observatory {
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(lines.flatMap(node => node.position), 3));
       points.geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
       geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
-      const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.14, depthWrite: false }));
+      const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.035, depthWrite: false }));
+      line.visible = false; // Reveal real connections on isolation, not a web over the disk.
       group.add(line);
       this.orbital.add(group);
       this.clusterObjects.set(cluster.id, { group, points, line, cluster, edgeNodes: lines });
     }
+    if (this.host?.dataset) this.host.dataset.noteStars = String([...this.clusterObjects.values()].reduce((sum, { points }) => sum + points.geometry.attributes.position.count, 0));
   }
 
   addTrails() {
@@ -144,6 +146,7 @@ export class Observatory {
     this.trails = new StarTrails(this.layout, this.quality);
     this.trails.selectedCluster = this.selectedCluster ?? null;
     this.orbital.add(this.trails.mesh);
+    this.trails.update(this.time);
     this.reportTrails();
   }
 
@@ -233,9 +236,11 @@ export class Observatory {
     this.selectedNode = null;
     this.trails.selectedCluster = id;
     this.trails.reset();
+    this.trails.update(this.time);
     this.reportTrails();
     for (const [clusterId, objects] of this.clusterObjects) {
       objects.group.visible = id === null || id === clusterId;
+      objects.line.visible = id !== null;
     }
     if (id === null) {
       this.setNavigationMode('orbit');
@@ -250,7 +255,8 @@ export class Observatory {
     if (!cluster) return;
     const target = new THREE.Vector3(...cluster.center).applyMatrix4(this.orbital.matrixWorld);
     const direction = this.camera.position.clone().sub(this.controls.target).normalize();
-    const position = target.clone().addScaledVector(direction, this.host.clientWidth < 700 ? 15 : 13);
+    const distance = cluster.count > 4 ? this.homePosition.length() : this.host.clientWidth < 700 ? 18 : 13;
+    const position = target.clone().addScaledVector(direction, distance);
     if (this.paused) {
       this.camera.position.copy(position);
       this.controls.target.copy(target);
@@ -280,7 +286,7 @@ export class Observatory {
     this.reportQuality();
     // Keep the central lens legible on a narrow screen without hiding controls.
     if (width < 700 && !this.mobileSized) {
-      this.camera.position.set(0, 5, 44);
+      this.camera.position.set(0, 32, 58);
       this.homePosition.copy(this.camera.position);
       this.controls.saveState();
       this.mobileSized = true;

@@ -1,5 +1,5 @@
 import './style.css';
-import { parseGraph, sampleGraph } from './graph.js';
+import { parseGraph } from './graph.js';
 import { SECTOR_COLORS } from './layout.js';
 import { Observatory } from './scene.js';
 
@@ -8,7 +8,6 @@ const format = value => new Intl.NumberFormat('en-US').format(value);
 const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 let scene;
 let graph;
-let sampled;
 let paused = motionQuery.matches;
 let selectedCluster = null;
 let selectedNode = null;
@@ -67,7 +66,8 @@ function selectCluster(id) {
     button.setAttribute('aria-pressed', String(Number(button.dataset.cluster) === id));
   }
   const cluster = graph.clusters.find(item => item.id === id);
-  const visibleNodes = scene ? sampled.nodes.filter(node => id === null || node.cluster === id).length : 0;
+  $('sector-status').textContent = scene ? (cluster ? 'ONE STREAM ISOLATED' : 'ALL NOTES FORM THE DISK') : 'ACCESSIBLE TOPOLOGY INDEX';
+  const visibleNodes = scene ? graph.nodes.filter(node => id === null || node.cluster === id).length : 0;
   $('render-count').textContent = `${format(visibleNodes)} / ${format(graph.nodes.length)}`;
   $('node-details').hidden = !cluster;
   $('interaction-guide').hidden = Boolean(cluster);
@@ -75,14 +75,14 @@ function selectCluster(id) {
   $('view-name').textContent = cluster ? cluster.label.toUpperCase() : 'ALL SYSTEMS';
   $('selection-title').textContent = cluster?.label || 'The whole, connected.';
   $('selection-description').textContent = cluster
-    ? `${format(cluster.count)} notes in this constellation. Select a star, or choose an anonymous ID below.`
-    : 'Individual notes become constellations. Their connections trace the space between.';
+    ? `${format(cluster.count)} notes in this disk stream. Select a star, or choose an anonymous ID below.`
+    : 'Every point of light in the disk is a note. Isolate a colored stream to explore its connections.';
   if (cluster) {
-    const nodes = sampled.nodes.filter(node => node.cluster === id);
+    const nodes = graph.nodes.filter(node => node.cluster === id);
     const select = $('node-select');
     select.replaceChildren(new Option('Choose an anonymous ID', ''));
     for (const node of nodes) select.append(new Option(node.id, node.id));
-    $('sector-render-count').textContent = `${format(nodes.length)} / ${format(cluster.count)} sector notes ${scene ? 'rendered' : 'listed'}.`;
+    $('sector-render-count').textContent = `${format(nodes.length)} / ${format(cluster.count)} sector notes ${scene ? 'in the disk' : 'listed'}.`;
     $('announcement').textContent = `${cluster.label} isolated. ${format(cluster.count)} notes.`;
   } else {
     $('announcement').textContent = 'View reset. All sectors visible.';
@@ -156,16 +156,15 @@ async function init() {
   graph = parseGraph(await response.json());
   for (const node of graph.nodes) adjacency.set(node.id, new Set());
   for (const [a, b] of graph.edges) { adjacency.get(a).add(b); adjacency.get(b).add(a); }
-  sampled = sampleGraph(graph, innerWidth < 700 ? 900 : 1800, innerWidth < 700 ? 160 : 260);
   $('notes-total').textContent = format(graph.totals.nodes);
   $('links-total').textContent = format(graph.totals.edges);
   $('sectors-total').textContent = format(graph.totals.clusters).padStart(2, '0');
   $('sector-fraction').textContent = `${String(graph.clusters.length).padStart(2, '0')} DETECTED`;
-  $('render-count').textContent = `${format(sampled.nodes.length)} / ${format(graph.nodes.length)}`;
-  $('sector-status').textContent = sampled.sampled ? 'BALANCED DISPLAY SAMPLE' : 'ALL NOTES IN VIEW';
+  $('render-count').textContent = `${format(graph.nodes.length)} / ${format(graph.nodes.length)}`;
+  $('sector-status').textContent = 'ALL NOTES FORM THE DISK';
   renderSectors();
   try {
-    scene = new Observatory($('observatory'), sampled, {
+    scene = new Observatory($('observatory'), graph, {
       paused, quality,
       onUnavailable: showWebGLFallback,
       onPick(node) {
@@ -179,7 +178,7 @@ async function init() {
           const marker = markers.get(pos.id);
           const covered = blockers.some(rect => pos.x + 105 > rect.left && pos.x - 44 < rect.right && pos.y - 20 > rect.top - top && pos.y - 65 < rect.bottom - top);
           marker.style.transform = `translate(${pos.x}px, ${pos.y - 65}px)`;
-          marker.hidden = covered || !pos.visible || (selectedCluster !== null && pos.id !== selectedCluster);
+          marker.hidden = covered || !pos.visible || pos.id !== selectedCluster;
         }
         $('node-reticle').hidden = !nodePosition?.visible;
         if (nodePosition) $('node-reticle').style.transform = `translate(${nodePosition.x - 13}px, ${nodePosition.y - 13}px)`;

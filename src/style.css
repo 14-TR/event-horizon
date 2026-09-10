@@ -97,7 +97,7 @@
   #node-facts > div { display: flex; justify-content: space-between; align-items: baseline; }
   #node-facts dt { color: #929ba7; font-size: 10px; }
   #node-facts dd { margin: 0; font: 11px var(--mono); color: #e0ceb3; }
-  .node-sample-note { font: 8px/1.8 var(--mono); color: #89939f; margin-top: 15px; }
+  .node-population-note { font: 8px/1.8 var(--mono); color: #89939f; margin-top: 15px; }
   #node-reticle { position: absolute; left: 0; top: 0; width: 26px; height: 26px; border: 1px solid #e5d2b49c; border-radius: 50%; pointer-events: none; }
   #node-reticle::before, #node-reticle::after { content: ''; width: 4px; height: 1px; background: #ddcbb1; position: absolute; top: 12px; }
   #node-reticle::before { left: -6px; } #node-reticle::after { right: -6px; }

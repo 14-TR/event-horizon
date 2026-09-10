@@ -28,28 +28,3 @@ export function parseGraph(raw) {
   }));
   return { nodes, edges, clusters, totals: { nodes: nodes.length, edges: edges.length, clusters: clusters.length } };
 }
-
-/** Round-robin coverage, not a claim to be a statistical sample. */
-export function sampleGraph(graph, cap = 1800, perSector = 260) {
-  const limit = Math.max(0, Math.floor(cap));
-  const sectorLimit = Math.max(0, Math.floor(perSector));
-  const buckets = new Map(graph.clusters.map(cluster => [cluster.id, []]));
-  for (const node of graph.nodes) buckets.get(node.cluster).push(node);
-  for (const [id, bucket] of buckets) {
-    bucket.sort((a, b) => a.id.localeCompare(b.id));
-    buckets.set(id, bucket.slice(0, sectorLimit));
-  }
-  const available = [...buckets.values()].reduce((sum, bucket) => sum + bucket.length, 0);
-  const nodes = [];
-  let round = 0;
-  while (nodes.length < Math.min(limit, available)) {
-    for (const bucket of buckets.values()) {
-      if (bucket[round]) nodes.push(bucket[round]);
-      if (nodes.length === limit) break;
-    }
-    round++;
-  }
-  const ids = new Set(nodes.map(node => node.id));
-  const edges = graph.edges.filter(([a, b]) => ids.has(a) && ids.has(b));
-  return { ...graph, nodes, edges, sampled: nodes.length < graph.nodes.length };
-}

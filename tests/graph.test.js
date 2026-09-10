@@ -44,32 +44,14 @@ test('rejects malformed, duplicate or dangling topology without reflecting input
   assert.throws(() => parseGraph(null), /^Error: Invalid topology\.$/);
 });
 
-test('samples deterministically across sectors and reports the exact visible subgraph', async () => {
-  const { parseGraph, sampleGraph } = await load();
-  assert.equal(typeof sampleGraph, 'function', 'bounded stratified sampling is implemented');
-  const graph = parseGraph(fixture());
-  const sampled = sampleGraph(graph, 2);
-  assert.equal(sampled.nodes.length, 2);
-  assert.equal(new Set(sampled.nodes.map(node => node.cluster)).size, 2);
-  assert.deepEqual(sampled.totals, { nodes: 3, edges: 2, clusters: 2 });
-  assert.equal(sampled.sampled, true);
-  assert.deepEqual(sampleGraph(graph, 2), sampled);
-  const ids = new Set(sampled.nodes.map(node => node.id));
-  assert.ok(sampled.edges.every(([a, b]) => ids.has(a) && ids.has(b)));
-  assert.equal(sampleGraph(graph, 100).sampled, false);
-  assert.equal(sampleGraph(graph, 0).nodes.length, 0);
-});
-
-test('per-sector caps keep dominant populations legible without dropping tiny sectors', async () => {
-  const { parseGraph, sampleGraph } = await load();
-  const graph = parseGraph({
-    version: 1,
-    nodes: Array.from({ length: 22 }, (_, i) => ({ id: `n${String(i + 1).padStart(6, '0')}`, cluster: i < 20 ? 0 : i - 19 })),
-    edges: [], clusters: [{ id: 0 }, { id: 1 }, { id: 2 }],
-  });
-  const sample = sampleGraph(graph, 100, 6);
-  assert.equal(sample.nodes.length, 8);
-  assert.deepEqual([0, 1, 2].map(id => sample.nodes.filter(node => node.cluster === id).length), [6, 1, 1]);
-  assert.equal(sample.sampled, true);
-  assert.equal(sample.totals.nodes, 22);
+test('the complete reviewed graph preserves all node identities, links and tiny sectors without a sampling API', async () => {
+  const { readFileSync } = await import('node:fs');
+  const api = await load();
+  const raw = JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url)));
+  const graph = api.parseGraph(raw);
+  assert.deepEqual(graph.nodes, raw.nodes.map(({ id, cluster }) => ({ id, cluster })));
+  assert.deepEqual(graph.edges, raw.edges);
+  assert.deepEqual(graph.totals, { nodes: 1675, edges: 1762, clusters: 8 });
+  assert.deepEqual(graph.clusters.map(c => c.count), raw.clusters.map(c => raw.nodes.filter(n => n.cluster === c.id).length));
+  assert.equal(api.sampleGraph, undefined, 'no obsolete sampling path remains to silently omit real notes');
 });
