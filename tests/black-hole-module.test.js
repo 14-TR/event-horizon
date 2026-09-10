@@ -1,0 +1,48 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Group, PerspectiveCamera, Vector3 } from 'three';
+import * as blackHole from '../src/black-hole.js';
+
+test('the module owns disposable render targets and tracks camera in a fixed hole frame', () => {
+  assert.equal(typeof blackHole.BlackHoleRenderer, 'function', 'reusable renderer must exist');
+  const hole = new blackHole.BlackHoleRenderer({ horizonRadius: 1.15 });
+  const parent = new Group();
+  parent.position.set(3, -2, 1);
+  parent.rotation.z = 0.3;
+  parent.add(hole.anchor);
+  const camera = new PerspectiveCamera(48, 1.6, 0.1, 250);
+  camera.position.set(-2, 4, 43);
+  camera.lookAt(0, 0, 0);
+  hole.update(camera, 12);
+  const expected = camera.position.clone().applyMatrix4(hole.anchor.matrixWorld.clone().invert());
+  const actual = new Vector3().setFromMatrixPosition(hole.uniforms.uCameraToHole.value);
+  assert.ok(actual.distanceTo(expected) < 1e-9);
+  assert.equal(hole.uniforms.uTime.value, 12);
+  const fixed = hole.anchor.quaternion.clone();
+  camera.position.set(20, 25, -12);
+  camera.lookAt(0, 0, 0);
+  hole.update(camera, 13);
+  assert.ok(hole.anchor.quaternion.equals(fixed), 'orbiting must not billboard the world frame');
+  hole.resize(1600, 1000, 2);
+  assert.ok(hole.target.width * hole.target.height <= 1100000);
+  hole.setQuality('mobile');
+  assert.equal(hole.rayMaterial.defines.MAX_STEPS, 96);
+  assert.ok(hole.target.width * hole.target.height <= 340000);
+  assert.throws(() => hole.setQuality('garbage'), /Unknown quality/);
+  let disposed = false;
+  hole.target.addEventListener('dispose', () => { disposed = true; });
+  hole.dispose();
+  assert.equal(disposed, true);
+});
+
+test('invalid hole scale and unsupported cameras fail before NaN ray uniforms', () => {
+  assert.throws(() => new blackHole.BlackHoleRenderer({ horizonRadius: 0 }), /positive/);
+  const hole = new blackHole.BlackHoleRenderer();
+  const camera = new PerspectiveCamera(48, 1, 0.1, 200);
+  hole.anchor.scale.set(1, 2, 1);
+  assert.throws(() => hole.update(camera, 0), /uniform scale/);
+  hole.anchor.scale.setScalar(1);
+  assert.throws(() => hole.update(camera, NaN), /finite/);
+  assert.throws(() => hole.update(new Group(), 0), /PerspectiveCamera/);
+  hole.dispose();
+});

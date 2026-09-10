@@ -1,7 +1,8 @@
 /** Art-directed tidal loops, not gravity physics. IDs and edges never change. */
+export const infallPeriod = sectorIndex => 42 + sectorIndex * 4;
 export function createInfall(layout) {
   const sectors = new Map(layout.clusters.map((cluster, index) => [cluster.id, {
-    cluster, period: 42 + index * 4, nodes: [],
+    cluster, period: infallPeriod(index), nodes: [],
   }]));
   for (const node of layout.nodes) {
     sectors.get(node.cluster).nodes.push({ node, origin: [...node.position], radius: Math.hypot(...node.position) });

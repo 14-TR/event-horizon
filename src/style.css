@@ -228,4 +228,41 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   }
+
+  /* Explore first: quieter typography and controls around a larger lens. */
+  .intro { top: 120px; }
+  h1 { font-size: 48px; line-height: .96; margin-top: 15px; }
+  .intro-description { margin-top: 14px; }
+  .sectors-panel { width: 212px; padding: 16px 14px 0; }
+  .inspector { width: 224px; padding: 17px; }
+  .glass { backdrop-filter: blur(9px); box-shadow: none; background: #0b1018a6; }
+  .singularity-caption { top: 74%; }
+  .vignette { opacity: .55; }
+  .render-controls { position: absolute; top: 173px; left: 52%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; white-space: nowrap; font: 9px var(--mono); }
+  .render-controls label { color: var(--muted); font-size: 7px; letter-spacing: .1em; }
+  #quality-select { min-height: 44px; width: 102px; border: 1px solid var(--line); border-radius: 3px; background: #0b1018ce; color: #c9cdd0; padding: 0 7px; font: 10px var(--mono); }
+  #cinematic-button { min-height: 44px; padding: 0 12px; border: 1px solid #d7ad7740; border-radius: 3px; background: #0b1018ce; color: #dbc29f; font: 10px var(--mono); }
+  #cinematic-button:hover { background: #211b13; }
+  #flight-help { margin-top: 68px; }
+  .cinematic-exit { position: fixed; top: max(18px, env(safe-area-inset-top)); right: max(22px, env(safe-area-inset-right)); z-index: 40; min-height: 44px; padding: 0 17px; border: 1px solid #d9c0a05c; border-radius: 3px; background: #070a10d9; color: #e0cdb2; font: 11px var(--mono); }
+  #app[data-cinematic="true"] { height: 100svh; min-height: 0; }
+  #app[data-cinematic="true"] .observatory { height: 100%; inset: 0; }
+  #app[data-cinematic="true"] [data-hud] { visibility: hidden !important; pointer-events: none !important; }
+  #app[data-cinematic="true"] .film-grain { display: none; }
+  @media (max-width: 700px) {
+    .intro { top: 95px; }
+    h1 { font-size: 38px; margin-top: 12px; }
+    .intro-description { margin-top: 10px; }
+    .intro .eyebrow { max-width: 170px; font-size: 6px; }
+    .telemetry { top: 98px; gap: 12px; }
+    .navigation-controls { top: 231px; left: 50%; }
+    .render-controls { top: 287px; left: 50%; gap: 6px; }
+    .render-controls label { display: none; }
+    #flight-help { margin-top: 61px; }
+    .sectors-panel { width: auto; padding: 12px 13px 0; }
+    .inspector { width: auto; }
+    .singularity-caption { display: none; }
+    .flight-pad { top: 482px; }
+    .cinematic-exit { top: max(14px, env(safe-area-inset-top)); right: 14px; }
+  }
 }

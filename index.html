@@ -12,6 +12,7 @@
   <a class="skip-link" href="#sector-list">Skip to sector controls</a>
   <div id="app" data-state="loading" data-navigation="orbit">
     <div id="observatory" class="observatory" data-renderer="pending"></div>
+    <button id="exit-cinematic" class="cinematic-exit" hidden>Exit cinematic view<span aria-hidden="true"> ↙</span></button>
     <div class="vignette" aria-hidden="true"></div>
     <div class="film-grain" aria-hidden="true"></div>
     <header class="masthead">
@@ -61,6 +62,13 @@
         <p class="privacy-note">Anonymous IDs. No titles. No content.</p>
       </aside>
 
+      <div class="render-controls" role="group" aria-label="Rendering controls">
+        <label for="quality-select">QUALITY</label>
+        <select id="quality-select" aria-label="Render quality" disabled>
+          <option value="mobile">Mobile</option><option value="desktop" selected>Desktop</option><option value="cinematic">Cinematic</option>
+        </select>
+        <button id="cinematic-button" aria-label="Cinematic view" aria-pressed="false" disabled>Cinematic <span aria-hidden="true">↗</span></button>
+      </div>
       <div class="navigation-controls" aria-label="Camera navigation">
         <div class="navigation-modes glass" role="group" aria-label="Navigation mode">
           <button id="orbit-button" aria-label="Orbit mode" aria-pressed="true" disabled>⊙ Orbit</button>
@@ -88,7 +96,7 @@
     </div>
     <footer><span>THE STRUCTURE REMAINS. THE STORIES STAY PRIVATE.</span><span class="footer-right">TR INGRAM<span>·</span>EVENT HORIZON / 01</span></footer>
   </div>
-  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Colored stars are actual sampled notes spiraling inward through 3D space. Each sector returns to its outer orbit on a repeating visual loop: no notes or connections are deleted. The paths and black hole are artistic, not a physical simulation. Gold dust and background stars are decoration. Only real within-sector connections are drawn, with endpoints following the moving notes.</p><p>In Orbit, drag to orbit and scroll or pinch to zoom. Select a sector to isolate and follow it. In Fly, use WASD to move, Q/E for down/up, and drag to look; touch users can hold the six thrust buttons. Selecting a sector returns to tracking Orbit. Reset view restores the home camera. Escape clears a selection. Pause and reduced motion freeze the simulation; deliberate camera controls still work.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
+  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Colored stars are actual sampled notes spiraling inward through 3D space. Each sector returns to its outer orbit on a repeating visual loop: no notes or connections are deleted. The paths and black hole are artistic, not a physical simulation. The turbulent gas and lensed background sky are artwork, not extra notes. Short colored trails follow actual note positions and clear when a sector recycles. Only real within-sector connections are drawn, with endpoints following the moving notes.</p><p>In Orbit, drag to orbit and scroll or pinch to zoom. Select a sector to isolate and follow it. In Fly, use WASD to move, Q/E for down/up, and drag to look; touch users can hold the six thrust buttons. Selecting a sector returns to tracking Orbit. Reset view restores the home camera. Cinematic view hides the HUD; its persistent exit button or Escape restores it. Render quality separately offers Mobile, Desktop and Cinematic budgets. Escape otherwise clears a selection. Pause and reduced motion freeze stars, trails and gas; deliberate camera controls still work.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
   <noscript><div class="noscript-notice">Event Horizon needs JavaScript for its 3D observatory. This site contains anonymous connection topology, not note titles or content.</div></noscript>
   <script type="module" src="/src/main.js"></script>
 </body>

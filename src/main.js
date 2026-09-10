@@ -13,6 +13,32 @@ let paused = motionQuery.matches;
 let selectedCluster = null;
 let selectedNode = null;
 let navigationMode = 'orbit';
+let cinematic = false;
+let quality = innerWidth < 700 ? 'mobile' : 'desktop';
+try {
+  const stored = localStorage.getItem('eh-render-quality');
+  if (['mobile', 'desktop', 'cinematic'].includes(stored)) quality = stored;
+} catch { /* Storage may be unavailable in private/embedded contexts. */ }
+$('quality-select').value = quality;
+const hud = [...document.querySelectorAll('.masthead, .intro, .telemetry, .sectors-panel, .inspector, #cluster-markers, #node-reticle, .singularity-caption, .navigation-controls, .render-controls, .flight-pad, .bottom-bar, footer')];
+for (const element of hud) element.dataset.hud = '';
+
+function setCinematic(value) {
+  cinematic = value;
+  scene?.flyControls.clear();
+  $('app').dataset.cinematic = String(value);
+  for (const element of hud) element.inert = value;
+  $('exit-cinematic').hidden = !value;
+  $('cinematic-button').setAttribute('aria-pressed', String(value));
+  (value ? $('exit-cinematic') : $('cinematic-button')).focus({ preventScroll: true });
+}
+$('cinematic-button').addEventListener('click', () => setCinematic(true));
+$('exit-cinematic').addEventListener('click', () => setCinematic(false));
+$('quality-select').addEventListener('change', event => {
+  quality = event.target.value;
+  scene?.setQuality(quality);
+  try { localStorage.setItem('eh-render-quality', quality); } catch { /* Optional preference only. */ }
+});
 const adjacency = new Map();
 const markers = new Map();
 
@@ -101,6 +127,9 @@ function renderSectors() {
 }
 
 function showWebGLFallback() {
+  if (cinematic) setCinematic(false);
+  $('quality-select').disabled = true;
+  $('cinematic-button').disabled = true;
   scene?.dispose();
   scene = undefined;
   setNavigationMode('orbit');
@@ -137,7 +166,7 @@ async function init() {
   renderSectors();
   try {
     scene = new Observatory($('observatory'), sampled, {
-      paused,
+      paused, quality,
       onUnavailable: showWebGLFallback,
       onPick(node) {
         if (selectedCluster !== node.cluster) selectCluster(node.cluster);
@@ -158,6 +187,8 @@ async function init() {
     });
     $('orbit-button').disabled = false;
     $('fly-button').disabled = false;
+    $('quality-select').disabled = false;
+    $('cinematic-button').disabled = false;
   } catch {
     showWebGLFallback();
   }
@@ -210,7 +241,9 @@ setPaused(paused);
 $('node-select').addEventListener('change', event => inspectNode(event.target.value));
 $('reset-button').addEventListener('click', () => { if (graph) selectCluster(null); });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !$('about-dialog').open && graph) selectCluster(null);
+  if (event.key !== 'Escape' || $('about-dialog').open) return;
+  if (cinematic) setCinematic(false);
+  else if (graph) selectCluster(null);
 });
 
 $('about-button').addEventListener('click', () => $('about-dialog').showModal());
