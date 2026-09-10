@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 
 for (const failure of ['missing-float-extension', 'startup-shader', 'runtime-shader']) {
   test(`${failure} stops rendering and keeps the accessible topology index`, async ({ page }) => {
@@ -18,6 +19,7 @@ for (const failure of ['missing-float-extension', 'startup-shader', 'runtime-sha
       }
     }, failure);
     await page.goto('./');
+    await openTools(page);
     if (failure === 'runtime-shader') {
       await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
       await page.getByRole('button', { name: 'Cinematic view', exact: true }).click();
@@ -42,6 +44,7 @@ for (const failure of ['missing-float-extension', 'startup-shader', 'runtime-sha
 test('all-node orbital exposures are bounded, pause exactly and rebuild coherently on quality/reset', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   const host = page.locator('#observatory');
   await expect(host).toHaveAttribute('data-renderer', 'webgl');
   await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(1675);
@@ -52,7 +55,7 @@ test('all-node orbital exposures are bounded, pause exactly and rebuild coherent
   await page.getByRole('button', { name: 'Resume motion', exact: true }).click();
   await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Pause motion', exact: true }).click();
-  const frame = () => host.locator('canvas').screenshot({ style: '#app > :not(.observatory) { visibility: hidden !important; }' });
+  const frame = () => host.locator('canvas').screenshot({ style: '.intro, #explore-tools, [data-hud], .vignette { visibility: hidden !important; }' });
   const stopped = await frame();
   await page.waitForTimeout(200);
   expect((await frame()).equals(stopped)).toBe(true);
@@ -65,6 +68,7 @@ test('all-node orbital exposures are bounded, pause exactly and rebuild coherent
 test('quality overrides and cinematic HUD hiding preserve a keyboard-accessible exit', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   const host = page.locator('#observatory');
   await expect(host).toHaveAttribute('data-renderer', 'webgl');
   const quality = page.getByLabel('Render quality');
@@ -78,14 +82,18 @@ test('quality overrides and cinematic HUD hiding preserve a keyboard-accessible 
   await page.getByRole('button', { name: 'Cinematic view', exact: true }).click();
   await expect(page.locator('#app')).toHaveAttribute('data-cinematic', 'true');
   await expect(page.locator('#sectors-panel')).toBeHidden();
-  const exit = page.getByRole('button', { name: 'Exit cinematic view', exact: true });
+  const exit = page.getByRole('button', { name: 'Event Horizon — open exploration controls', exact: true });
   await expect(exit).toBeVisible();
   await expect(exit).toBeFocused();
   const box = await exit.boundingBox();
   expect(box.height).toBeGreaterThanOrEqual(44);
-  await page.keyboard.press('Escape');
+  await page.keyboard.press('Enter');
   await expect(page.locator('#sectors-panel')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Cinematic view', exact: true })).toBeFocused();
+  await expect(page.locator('#title-toggle')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sectors-panel')).toBeHidden();
+  await expect(exit).toBeFocused();
   await page.reload();
+  await openTools(page);
   await expect(quality).toHaveValue('cinematic');
 });

@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 import { makeFixture } from '../fixture.js';
 
-const frame = page => page.locator('#observatory canvas').screenshot({ style: '#app > :not(.observatory) { visibility: hidden !important; }' });
+const frame = page => page.locator('#observatory canvas').screenshot({ style: '.intro, #explore-tools, [data-hud], .vignette { visibility: hidden !important; }' });
 
 async function load(page) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('**/graph.json', route => route.fulfill({ json: makeFixture() }));
   await page.goto('./');
+  await openTools(page);
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
 }
 
@@ -72,11 +74,20 @@ test.describe('touch flight', () => {
 test('real topology stars move, pause exactly and remain raycastable at their new positions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
   await page.locator('.sector-button').first().click();
-  const id = await page.locator('#node-select option').nth(1).getAttribute('value');
-  await page.getByLabel('Inspect an anonymous node').selectOption(id);
   const reticle = page.locator('#node-reticle');
+  // Low-angle views correctly occlude some direct stars. Exercise a genuinely
+  // visible member rather than requiring a far-side node to pierce the shadow.
+  let id;
+  const ids = await page.locator('#node-select option').evaluateAll(options => options.map(o => o.value).filter(Boolean));
+  for (const candidate of ids) {
+    await page.getByLabel('Inspect an anonymous node').selectOption(candidate);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    if (await reticle.isVisible()) { id = candidate; break; }
+  }
+  expect(id, 'at least one real member must be directly inspectable').toBeTruthy();
   await expect(reticle).toBeVisible();
   const initial = await reticle.getAttribute('style');
   const frozen = await frame(page);

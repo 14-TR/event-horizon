@@ -8,6 +8,13 @@ import { BlackHoleRenderer } from './black-hole.js';
 import { StarTrails } from './star-trails.js';
 import { DiskRadiance } from './disk-radiance.js';
 
+/** Low, slightly rolled framing; narrow screens keep the disk, not UI margins. */
+export function openingFrame(width, height) {
+  const aspect = Math.max(1, width) / Math.max(1, height);
+  const depth = Math.max(19, 25 / aspect);
+  return { position: [0, depth * 0.235, depth], target: [0, depth * 0.052, 0], up: [0.10, 1, 0] };
+}
+
 /** All artwork is generated locally. No external textures, fonts or network services. */
 export class Observatory {
   constructor(host, graph, { paused = false, quality = host.clientWidth < 700 ? 'mobile' : 'desktop', onProject = () => {}, onPick = () => {}, onUnavailable = () => {} } = {}) {
@@ -32,10 +39,12 @@ export class Observatory {
     this.renderer.setClearColor(0x030407, 1);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge observatory. Orbit: drag and scroll. Fly: WASD moves, Q/E down/up, drag to look. Warped arcs are noninteractive repeated note light. Inspect direct stars or use the complete sector and node controls alongside.');
+    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge observatory. Orbit: drag and scroll. Fly: WASD moves, Q/E down/up, drag to look. Warped arcs are noninteractive repeated note light. Inspect direct stars or select the Event Horizon title to open the complete sector and node controls.');
     this.renderer.domElement.setAttribute('role', 'img');
     this.renderer.domElement.tabIndex = 0;
     host.append(this.renderer.domElement);
+    const opening = openingFrame(host.clientWidth, host.clientHeight);
+    this.camera.up.fromArray(opening.up).normalize();
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !paused;
     this.controls.dampingFactor = 0.055;
@@ -45,8 +54,8 @@ export class Observatory {
     this.controls.rotateSpeed = 0.45;
     this.controls.zoomSpeed = 0.7;
     this.controls.addEventListener('start', () => { this.flight = null; });
-    this.homePosition = new THREE.Vector3(0, 16, 29);
-    this.homeTarget = new THREE.Vector3(0, 0, 0);
+    this.homePosition = new THREE.Vector3(...opening.position);
+    this.homeTarget = new THREE.Vector3(...opening.target);
     this.camera.position.copy(this.homePosition);
     this.controls.target.copy(this.homeTarget);
     this.controls.update();
@@ -291,12 +300,18 @@ export class Observatory {
     this.renderer.setSize(width, height, false);
     this.blackHole.resize(width, height, this.renderer.getPixelRatio());
     this.reportQuality();
-    // Keep the central lens legible on a narrow screen without hiding controls.
-    if (width < 700 && !this.mobileSized) {
-      this.camera.position.set(0, 32, 58);
-      this.homePosition.copy(this.camera.position);
+    const atHome = this.navigationMode === 'orbit' && this.selectedCluster == null
+      && this.camera.position.distanceToSquared(this.homePosition) < 1e-8
+      && this.controls.target.distanceToSquared(this.homeTarget) < 1e-8;
+    const opening = openingFrame(width, height);
+    this.homePosition.fromArray(opening.position);
+    this.homeTarget.fromArray(opening.target);
+    // Reframe only an untouched home view; never teleport orbit/flight input.
+    if (atHome) {
+      this.camera.position.copy(this.homePosition);
+      this.controls.target.copy(this.homeTarget);
+      this.controls.update();
       this.controls.saveState();
-      this.mobileSized = true;
     }
   }
 

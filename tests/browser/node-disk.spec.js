@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const graph = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url)));
@@ -23,6 +24,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       };
     });
     await page.goto('./');
+    await openTools(page);
     const host = page.locator('#observatory');
     await expect(host).toHaveAttribute('data-renderer', 'webgl');
     const expectedCounts = graph.clusters.map(c => graph.nodes.filter(n => n.cluster === c.id).length).sort((a, b) => a - b);

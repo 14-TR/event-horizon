@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 // Diagnostic scenes live only in intercepted test modules, not the deployed app.
@@ -15,6 +16,7 @@ test('actual far-side source light reaches both shadow arcs and follows camera a
   });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   const result = await page.evaluate(async () => {
     const T = await import('/__lens/three.js');
     const { BlackHoleRenderer } = await import('/__lens/black-hole.js');
@@ -108,6 +110,7 @@ test('bounded live-motion pacing receipt covers each real-graph quality without 
       page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
       await page.addInitScript(quality => localStorage.setItem('eh-render-quality', quality), setting.quality);
       await page.goto(baseURL);
+      await openTools(page);
       await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
       await page.bringToFront();
       // Include normal user activation, and record headless scheduler state.

@@ -2,54 +2,54 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Event Horizon — A knowledge observatory</title>
   <meta name="description" content="An interactive orbital observatory of knowledge connections. Topology only. No note content." />
-  <meta name="theme-color" content="#060709" />
+  <meta name="theme-color" content="#030407" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2306080a'/%3E%3Cellipse cx='32' cy='32' rx='27' ry='9' fill='none' stroke='%23e8a15b' stroke-width='3' transform='rotate(-18 32 32)'/%3E%3Ccircle cx='32' cy='32' r='15' fill='%2306080a' stroke='%23ffd69e' stroke-width='2'/%3E%3C/svg%3E" />
 </head>
 <body>
   <a class="skip-link" href="#sector-list">Skip to sector controls</a>
-  <div id="app" data-state="loading" data-navigation="orbit">
-    <div id="observatory" class="observatory" data-renderer="pending"></div>
-    <button id="exit-cinematic" class="cinematic-exit" hidden>Exit cinematic view<span aria-hidden="true"> ↙</span></button>
-    <div class="vignette" aria-hidden="true"></div>
-    <div class="film-grain" aria-hidden="true"></div>
-    <header class="masthead">
-      <a class="wordmark" href="./" aria-label="Event Horizon home">
-        <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="9"/><ellipse cx="18" cy="18" rx="17" ry="5" transform="rotate(-28 18 18)"/></svg>
-        <span>EH<span class="wordmark-divider">/</span><span class="wordmark-sub">A KNOWLEDGE OBSERVATORY</span></span>
-      </a>
-      <div class="masthead-right"><span class="privacy-tag">TOPOLOGY, NOT CONTENT</span><button id="about-button" class="icon-button" aria-label="About this observatory">i</button></div>
+  <div id="app" data-state="loading" data-navigation="orbit" data-cinematic="true">
+    <header class="intro">
+      <h1 id="title" aria-label="Event Horizon"><button id="title-toggle" aria-label="Event Horizon — open exploration controls" aria-expanded="false" aria-controls="explore-tools"><span>EVENT</span><span>HORIZON</span></button></h1>
     </header>
 
-    <main>
-      <section class="intro" aria-labelledby="title">
-        <p class="eyebrow"><span class="tiny-cross">+</span> AN EXPLORATION OF CONNECTED THOUGHT</p>
-        <h1 id="title" aria-label="Event Horizon">EVENT<br>HORIZON</h1>
-        <p class="intro-description">A second brain, seen from a distance.</p>
-      </section>
-
+    <aside id="explore-tools" aria-label="Exploration controls" hidden inert>
+      <div class="tools-heading"><p class="eyebrow">THE OBSERVATORY</p><button id="about-button" class="icon-button" aria-label="About this observatory">i</button></div>
+      <div class="navigation-controls" aria-label="Camera navigation">
+        <div class="navigation-modes" role="group" aria-label="Navigation mode">
+          <button id="orbit-button" aria-label="Orbit mode" aria-pressed="true" disabled>Orbit</button>
+          <button id="fly-button" aria-label="Fly mode" aria-pressed="false" disabled>Free flight</button>
+        </div>
+        <p id="flight-help" hidden><strong>WASD</strong> move · <strong>Q / E</strong> down / up<br>Drag to look, or hold the thrust buttons.<br>Pause freezes stars, not your controls.</p>
+      </div>
+      <div id="flight-pad" class="flight-pad" role="group" aria-label="Flight thrust controls" hidden>
+        <button data-flight="left" aria-label="Fly left">←<small>LEFT</small></button>
+        <button data-flight="forward" aria-label="Fly forward">↑<small>FWD</small></button>
+        <button data-flight="back" aria-label="Fly back">↓<small>BACK</small></button>
+        <button data-flight="right" aria-label="Fly right">→<small>RIGHT</small></button>
+        <button data-flight="down" aria-label="Fly down">−<small>DOWN</small></button>
+        <button data-flight="up" aria-label="Fly up">+<small>UP</small></button>
+      </div>
+      <div class="view-controls" role="group" aria-label="View controls"><button id="pause-button" aria-label="Pause motion" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause motion</span></button><button id="reset-button"><span aria-hidden="true">↺</span>Reset view</button></div>
+      <div class="render-controls" role="group" aria-label="Rendering controls">
+        <label for="quality-select">QUALITY</label>
+        <select id="quality-select" aria-label="Render quality" disabled><option value="mobile">Mobile</option><option value="desktop" selected>Desktop</option><option value="cinematic">Cinematic</option></select>
+        <button id="cinematic-button" aria-label="Cinematic view" aria-pressed="true" disabled>Return to scene</button>
+      </div>
       <section class="telemetry" aria-label="Topology totals">
         <div><span id="notes-total" class="metric">—</span><span class="eyebrow">NOTES</span></div>
         <div><span id="links-total" class="metric">—</span><span class="eyebrow">CONNECTIONS</span></div>
         <div><span id="sectors-total" class="metric">—</span><span class="eyebrow">SECTORS</span></div>
       </section>
-
-      <section id="sectors-panel" class="sectors-panel glass" aria-labelledby="sectors-title">
-        <div class="panel-heading"><span class="eyebrow">STELLAR ACCRETION</span><span id="sector-fraction" class="eyebrow">—</span></div>
-        <h2 id="sectors-title">Disk streams</h2>
-        <p class="panel-description">Isolate a sector within the shared disk.</p>
+      <section id="sectors-panel" class="sectors-panel" aria-labelledby="sectors-title">
+        <div class="panel-heading"><h2 id="sectors-title">Disk streams</h2><span id="sector-fraction" class="eyebrow">—</span></div>
+        <p class="panel-description">Isolate a stream. Every note is here.</p>
         <nav id="sector-list" aria-label="Disk streams" tabindex="-1"></nav>
         <div class="panel-foot"><span class="status-dot"></span><span id="sector-status">ACQUIRING TOPOLOGY</span></div>
       </section>
-
-      <div id="cluster-markers" aria-label="Orbital sector markers"></div>
-      <div id="node-reticle" hidden aria-hidden="true"><span id="reticle-label"></span></div>
-      <div class="singularity-caption" id="singularity-caption" aria-hidden="true"><span class="caption-rule"></span><p class="eyebrow">NOTES, IN ORBIT</p><p>One shared disk. Every note included.</p></div>
-
-      <aside id="inspector" class="inspector glass" aria-labelledby="selection-title">
-        <div class="panel-heading"><span class="eyebrow">OBSERVATION DECK</span><span class="reticle" aria-hidden="true">⌖</span></div>
+      <section id="inspector" class="inspector" aria-labelledby="selection-title">
         <h2 id="selection-title">The whole, connected.</h2>
         <p id="selection-description">Every star in the disk is a note. Warped arcs repeat their light. Isolate a colored stream to explore its connections.</p>
         <div id="node-details" hidden>
@@ -58,45 +58,33 @@
           <dl id="node-facts" hidden><div><dt>Anonymous ID</dt><dd id="node-id"></dd></div><div><dt>Total connections</dt><dd id="node-degree"></dd></div></dl>
           <p id="sector-render-count" class="node-population-note"></p>
         </div>
-        <div class="interaction-guide" id="interaction-guide"><div><span>↔</span> Drag to orbit</div><div><span>↕</span> Scroll to approach</div><div><span>⊙</span> Select a direct star to inspect</div></div>
+        <div class="interaction-guide" id="interaction-guide"><div>Drag to orbit · scroll to approach</div><div>Select a direct star to inspect</div></div>
         <p class="privacy-note">Anonymous IDs. No titles. No content.</p>
-      </aside>
+      </section>
+      <div class="bottom-bar"><div class="view-status"><span class="status-dot"></span><span id="view-state">LIVE ORBIT</span><span id="view-name">ALL SYSTEMS</span></div><div class="render-stat"><span id="render-count">— / —</span><span class="eyebrow">NOTES IN DISK</span></div></div>
+      <footer>THE STRUCTURE REMAINS.<br>THE STORIES STAY PRIVATE.</footer>
+    </aside>
 
-      <div class="render-controls" role="group" aria-label="Rendering controls">
-        <label for="quality-select">QUALITY</label>
-        <select id="quality-select" aria-label="Render quality" disabled>
-          <option value="mobile">Mobile</option><option value="desktop" selected>Desktop</option><option value="cinematic">Cinematic</option>
-        </select>
-        <button id="cinematic-button" aria-label="Cinematic view" aria-pressed="false" disabled>Cinematic <span aria-hidden="true">↗</span></button>
-      </div>
-      <div class="navigation-controls" aria-label="Camera navigation">
-        <div class="navigation-modes glass" role="group" aria-label="Navigation mode">
-          <button id="orbit-button" aria-label="Orbit mode" aria-pressed="true" disabled>⊙ Orbit</button>
-          <button id="fly-button" aria-label="Fly mode" aria-pressed="false" disabled>↗ Fly</button>
-        </div>
-        <p id="flight-help" hidden><strong>WASD</strong> move · <strong>Q / E</strong> down / up<br>Drag to look · hold the thrust buttons.<br>Pause freezes stars, not your controls.</p>
-      </div>
-      <div id="flight-pad" class="flight-pad glass" role="group" aria-label="Flight thrust controls" hidden>
-        <button data-flight="left" aria-label="Fly left">←<small>LEFT</small></button>
-        <button data-flight="forward" aria-label="Fly forward">↑<small>FWD</small></button>
-        <button data-flight="back" aria-label="Fly back">↓<small>BACK</small></button>
-        <button data-flight="right" aria-label="Fly right">→<small>RIGHT</small></button>
-        <button data-flight="down" aria-label="Fly down">−<small>DOWN</small></button>
-        <button data-flight="up" aria-label="Fly up">+<small>UP</small></button>
-      </div>
+    <main aria-label="Immersive observatory">
+      <div id="observatory" class="observatory" data-renderer="pending"></div>
+      <div class="vignette" aria-hidden="true"></div>
+      <div id="cluster-markers" aria-label="Orbital sector markers" data-hud></div>
+      <div id="node-reticle" hidden aria-hidden="true" data-hud><span id="reticle-label"></span></div>
       <div class="loading-notice" id="loading-notice" role="status"><span class="loading-orbit"></span>Resolving the stellar disk…</div>
-      <div id="fallback" class="fallback glass" hidden><p class="eyebrow">SIGNAL UNAVAILABLE</p><h2 id="fallback-title">The observatory is offline.</h2><p id="fallback-description"></p><button id="retry-button" class="text-button">Try again</button></div>
+      <div id="fallback" class="fallback" hidden><p class="eyebrow">SIGNAL UNAVAILABLE</p><h2 id="fallback-title">The observatory is offline.</h2><p id="fallback-description"></p><button id="retry-button" class="text-button">Try again</button></div>
       <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
     </main>
-
-    <div class="bottom-bar">
-      <div class="view-status"><span class="status-dot"></span><span id="view-state">LIVE ORBIT</span><span class="view-status-divider">/</span><span id="view-name">ALL SYSTEMS</span></div>
-      <div class="view-controls" role="group" aria-label="View controls"><button id="pause-button" aria-label="Pause motion" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause motion</span></button><span class="control-divider"></span><button id="reset-button"><span aria-hidden="true">↺</span>Reset view</button></div>
-      <div class="render-stat"><span id="render-count">— / —</span><span class="eyebrow">NOTES IN DISK</span></div>
-    </div>
-    <footer><span>THE STRUCTURE REMAINS. THE STORIES STAY PRIVATE.</span><span class="footer-right">TR INGRAM<span>·</span>EVENT HORIZON / 01</span></footer>
   </div>
-  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Every colored star in the disk is an actual note. All notes are included on desktop and mobile: sectors form interleaved spiral streams within one thin, three-dimensional accretion disk. Notes rotate inward and wrap individually to the outer edge, always outside the absorbing horizon. No note or connection is deleted, and no invented notes fill the disk.</p><p>The dim background sky is separate decorative artwork. A bounded, camera-dependent ray approximation now also samples a disk-space image of the actual note stars and their trails: far-side light bends into upper and lower arcs around the black shadow. <strong>Warped arcs are noninteractive repeated light, not extra notes.</strong> Inspect a direct star or use the complete anonymous ID selector. This thin-disk approximation flattens the small vertical spread; it is not a full gravity simulation or exact physical lensing. The narrow luminous images and modest highlights are emitted light, not a reflective surface. Procedural gas is disabled. Short colored trails are bounded exposures of those same notes along their actual visual trajectories, including in the frozen opening. Isolating a sector reveals only its stream and real within-sector connections. Cross-sector connections remain in the data and total neighbor counts. The bottom count reports notes included in the disk, not pixels currently visible through the horizon or camera.</p><p>In Orbit, drag to orbit and scroll or pinch to zoom. Select a sector to isolate its stream. In Fly, use WASD to move, Q/E for down/up, and drag to look; touch users can hold the six thrust buttons. Selecting a sector returns to Orbit. Reset view restores the home camera and all sectors. Cinematic view hides the HUD; its persistent exit button or Escape restores it. Render quality changes ray and trail detail, never note coverage. Escape otherwise clears a selection. Pause and reduced motion freeze stars and trails; deliberate camera controls still work.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
+  <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title">
+    <button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2>
+    <p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p>
+    <p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p>
+    <p>Every colored star in the disk is an actual note. All notes are included on desktop and mobile: sectors form interleaved spiral streams within one thin, three-dimensional accretion disk. Notes rotate inward and wrap individually to the outer edge, always outside the absorbing horizon. No note or connection is deleted, and no invented notes fill the disk.</p>
+    <p>The dim background sky is separate decorative artwork. A bounded, camera-dependent ray approximation samples a disk-space image of the actual note stars and their trails: far-side light bends into upper and lower arcs around the black shadow. <strong>Warped arcs are noninteractive repeated light, not extra notes.</strong> Inspect a direct star or use the complete anonymous ID selector. This thin-disk approximation flattens the small vertical spread and uses a finite light footprint; it is not a full gravity simulation or exact physical lensing. The narrow luminous images and modest highlights are emitted light, not a reflective surface. Procedural gas is disabled.</p>
+    <p>Short colored trails are bounded exposures of those same notes along their actual visual trajectories, including in the frozen opening. Isolating a sector reveals only its stream and real within-sector connections. Cross-sector connections remain in the data and total neighbor counts. The count reports notes included in the disk, not pixels currently visible through the horizon or viewport.</p>
+    <p>Select the title to reveal the tools. Drag to orbit; scroll or pinch to approach. Free flight uses WASD, Q/E, or the touch thrust controls. Escape returns to the scene. Reduced motion starts paused, with all navigation still available.</p>
+    <button id="close-about-done" class="text-button">Back to the observatory</button>
+  </dialog>
   <noscript><div class="noscript-notice">Event Horizon needs JavaScript for its 3D observatory. This site contains anonymous connection topology, not note titles or content.</div></noscript>
   <script type="module" src="/src/main.js"></script>
 </body>

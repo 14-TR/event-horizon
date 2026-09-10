@@ -12,27 +12,36 @@ let paused = motionQuery.matches;
 let selectedCluster = null;
 let selectedNode = null;
 let navigationMode = 'orbit';
-let cinematic = false;
+let cinematic = true;
 let quality = innerWidth < 700 ? 'mobile' : 'desktop';
 try {
   const stored = localStorage.getItem('eh-render-quality');
   if (['mobile', 'desktop', 'cinematic'].includes(stored)) quality = stored;
 } catch { /* Storage may be unavailable in private/embedded contexts. */ }
 $('quality-select').value = quality;
-const hud = [...document.querySelectorAll('.masthead, .intro, .telemetry, .sectors-panel, .inspector, #cluster-markers, #node-reticle, .singularity-caption, .navigation-controls, .render-controls, .flight-pad, .bottom-bar, footer')];
-for (const element of hud) element.dataset.hud = '';
+const hud = [...document.querySelectorAll('[data-hud]')];
 
-function setCinematic(value) {
+function setCinematic(value, { focus = true } = {}) {
   cinematic = value;
   scene?.flyControls.clear();
   $('app').dataset.cinematic = String(value);
   for (const element of hud) element.inert = value;
-  $('exit-cinematic').hidden = !value;
+  $('explore-tools').hidden = value;
+  $('explore-tools').inert = value;
+  $('title-toggle').setAttribute('aria-expanded', String(!value));
+  $('title-toggle').setAttribute('aria-label', `Event Horizon — ${value ? 'open' : 'close'} exploration controls`);
   $('cinematic-button').setAttribute('aria-pressed', String(value));
-  (value ? $('exit-cinematic') : $('cinematic-button')).focus({ preventScroll: true });
+  if (focus) $('title-toggle').focus({ preventScroll: true });
 }
 $('cinematic-button').addEventListener('click', () => setCinematic(true));
-$('exit-cinematic').addEventListener('click', () => setCinematic(false));
+$('title-toggle').addEventListener('click', () => setCinematic(!cinematic));
+document.querySelector('.skip-link').addEventListener('click', event => {
+  event.preventDefault();
+  setCinematic(false, { focus: false });
+  $('sector-list').focus({ preventScroll: true });
+  $('sector-list').scrollIntoView({ block: 'nearest' });
+});
+setCinematic(true, { focus: false });
 $('quality-select').addEventListener('change', event => {
   quality = event.target.value;
   scene?.setQuality(quality);
@@ -71,7 +80,7 @@ function selectCluster(id) {
   $('render-count').textContent = `${format(visibleNodes)} / ${format(graph.nodes.length)}`;
   $('node-details').hidden = !cluster;
   $('interaction-guide').hidden = Boolean(cluster);
-  $('singularity-caption').hidden = Boolean(cluster);
+
   $('view-name').textContent = cluster ? cluster.label.toUpperCase() : 'ALL SYSTEMS';
   $('selection-title').textContent = cluster?.label || 'The whole, connected.';
   $('selection-description').textContent = cluster
@@ -84,6 +93,7 @@ function selectCluster(id) {
     for (const node of nodes) select.append(new Option(node.id, node.id));
     $('sector-render-count').textContent = `${format(nodes.length)} / ${format(cluster.count)} sector notes ${scene ? 'in the disk' : 'listed'}.`;
     $('announcement').textContent = `${cluster.label} isolated. ${format(cluster.count)} notes.`;
+    $('inspector').scrollIntoView({ block: 'nearest' });
   } else {
     $('announcement').textContent = 'View reset. All sectors visible.';
   }
@@ -168,12 +178,13 @@ async function init() {
       paused, quality,
       onUnavailable: showWebGLFallback,
       onPick(node) {
+        setCinematic(false, { focus: false });
         if (selectedCluster !== node.cluster) selectCluster(node.cluster);
         inspectNode(node.id);
       },
       onProject(positions, nodePosition) {
         const top = $('app').getBoundingClientRect().top;
-        const blockers = ['.intro', '.telemetry', '.sectors-panel', '.inspector'].map(selector => document.querySelector(selector)).filter(el => el.offsetHeight).map(el => el.getBoundingClientRect());
+        const blockers = ['.intro', '#explore-tools'].map(selector => document.querySelector(selector)).filter(el => el.offsetHeight).map(el => el.getBoundingClientRect());
         for (const pos of positions) {
           const marker = markers.get(pos.id);
           const covered = blockers.some(rect => pos.x + 105 > rect.left && pos.x - 44 < rect.right && pos.y - 20 > rect.top - top && pos.y - 65 < rect.bottom - top);
@@ -241,8 +252,7 @@ $('node-select').addEventListener('change', event => inspectNode(event.target.va
 $('reset-button').addEventListener('click', () => { if (graph) selectCluster(null); });
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape' || $('about-dialog').open) return;
-  if (cinematic) setCinematic(false);
-  else if (graph) selectCluster(null);
+  if (!cinematic) setCinematic(true);
 });
 
 $('about-button').addEventListener('click', () => $('about-dialog').showModal());

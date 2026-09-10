@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 // Serve verification-only source modules through interception, never production routes.
@@ -17,6 +18,7 @@ test('GPU depth rejects hidden stars, preserves foreground stars and survives hi
   });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   const results = await page.evaluate(async () => {
     const T = await import('/__verify/three.js');
     const { BlackHoleRenderer } = await import('/__verify/black-hole.js');
@@ -50,13 +52,14 @@ test.describe('combined real topology high-DPI visual acceptance', () => {
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('./');
+    await openTools(page);
     await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
     await page.screenshot({ path: 'test-results/integration-desktop.png' });
     await page.getByLabel('Render quality').selectOption('cinematic');
     await page.getByRole('button', { name: 'Cinematic view', exact: true }).click();
     const shot = name => page.screenshot({ path: `test-results/integration-${name}.png` });
     const home = async () => {
-      await page.getByRole('button', { name: 'Exit cinematic view', exact: true }).click();
+      await page.getByRole('button', { name: 'Event Horizon — open exploration controls', exact: true }).click();
       await page.getByRole('button', { name: 'Reset view', exact: true }).click();
       await page.getByRole('button', { name: 'Cinematic view', exact: true }).click();
     };
@@ -66,18 +69,19 @@ test.describe('combined real topology high-DPI visual acceptance', () => {
     };
     await shot('cinematic');
     await drag(750, 390, 0, 365); await shot('above');
-    // Home elevation is atan2(16, 29); OrbitControls uses 2π * 0.45 per canvas height.
-    await home(); await drag(750, 490, 0, -178.312233129); await shot('edge');
+    // Solve world camera.y = 0 with the opening's rolled up vector and raised
+    // target; OrbitControls uses 2π * 0.45 per canvas height (1000 here).
+    await home(); await drag(750, 490, 0, -82.5264421234233); await shot('edge');
     await home(); await drag(160, 490, 1100, 0); await shot('reverse');
     await home(); await drag(750, 650, 0, -300); await shot('below');
     await home();
-    await page.getByRole('button', { name: 'Exit cinematic view', exact: true }).click();
+    await page.getByRole('button', { name: 'Event Horizon — open exploration controls', exact: true }).click();
     await page.getByRole('button', { name: 'Fly mode', exact: true }).click();
     await page.getByRole('button', { name: 'Cinematic view', exact: true }).click();
     await page.keyboard.down('w'); await page.waitForTimeout(1000); await page.keyboard.up('w');
     await shot('close-flight');
     await home();
-    await page.getByRole('button', { name: 'Exit cinematic view', exact: true }).click();
+    await page.getByRole('button', { name: 'Event Horizon — open exploration controls', exact: true }).click();
     await page.getByLabel('Render quality').selectOption('desktop');
     await page.getByRole('button', { name: 'Resume motion', exact: true }).click();
     const metrics = await page.evaluate(async () => {
@@ -105,6 +109,7 @@ test.describe('mobile high-DPI visual acceptance', () => {
   test('mobile ray/trail budgets and cinematic exit stay usable on the real graph', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('./');
+    await openTools(page);
     const host = page.locator('#observatory');
     await expect(host).toHaveAttribute('data-quality', 'mobile');
     expect(Number(await host.getAttribute('data-ray-pixels'))).toBeLessThanOrEqual(340000);
@@ -119,7 +124,7 @@ test.describe('mobile high-DPI visual acceptance', () => {
     await page.screenshot({ path: 'test-results/integration-mobile.png', fullPage: true });
     await page.getByRole('button', { name: 'Cinematic view', exact: true }).tap();
     await page.screenshot({ path: 'test-results/integration-mobile-cinematic.png' });
-    await page.getByRole('button', { name: 'Exit cinematic view', exact: true }).tap();
+    await page.getByRole('button', { name: 'Event Horizon — open exploration controls', exact: true }).tap();
     await expect(page.locator('#sectors-panel')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

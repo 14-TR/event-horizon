@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 import { readFileSync } from 'node:fs';
 
 const raw = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8'));
@@ -12,6 +13,7 @@ test('real public topology has truthful counts and discoverable tiny sectors', a
   page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/') && !request.url().startsWith('data:')) external.push(request.url()); });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
   await expect(page.locator('#notes-total')).toHaveText(fmt(raw.nodes.length));
   await expect(page.locator('#links-total')).toHaveText(fmt(raw.edges.length));
@@ -33,6 +35,7 @@ test('real mobile observatory stays in bounds and exposes the inspector and priv
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await openTools(page);
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
   await expect(page.locator('#render-count')).toHaveText(`${fmt(raw.nodes.length)} / ${fmt(raw.nodes.length)}`);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

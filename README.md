@@ -30,16 +30,17 @@ The production base is **`/event-horizon/`**, suitable for a GitHub Pages projec
 
 ## Explore
 
+- **The opening is the title and the scene.** Select **EVENT HORIZON** to reveal a single scrollable exploration drawer; select it again or press **Escape** to return to the scene. The title is a keyboard/touch button with an explicit accessible label and expanded state. Hidden tools are inert, not deleted. No dashboard or exit-button chrome competes with the opening.
 - **Orbit mode:** drag to orbit in 3D; **scroll or pinch** to zoom. Right-drag pans.
 - **Fly mode:** **WASD** moves forward/back/left/right relative to your view; **Q / E** moves down/up. **Drag** on the sky to look around. The six **hold-to-move thrust buttons** also work with touch or Space/Enter. Releasing or cancelling input stops movement immediately; changing tabs or losing focus clears held inputs. Flight stays within the scene and outside the central horizon.
 - Select a **sector button** to isolate its colored stream within the same disk. Its real within-sector connections become visible. Large streams keep the disk-wide view; tiny sectors are approached for inspection. Orbit follows the selected sector’s center. Selecting an active sector again clears isolation. Switching to Fly releases tracking without clearing the selected stream.
 - **Click a direct colored star** to inspect its anonymous ID and total unique neighbors, including connections outside the isolated sector. Picking and selected reticles use the same approximate depth as the black-hole image. **Warped arcs are noninteractive repeated light**, not extra notes or independently pickable stars; use the direct star or the complete ID selector.
 - The native **anonymous node selector** includes every node in that sector, providing the same data inspection without pointer picking. No IDs are truncated by a display cap.
-- **Reset view** restores Orbit mode, the home camera and all sectors, without resetting simulation time. **Escape** clears the selection, or closes the About dialog when open.
-- **Cinematic view** hides the HUD without changing simulation or quality. A persistent **Exit cinematic view** button remains visible, focused, keyboard/touch accessible, and at least 44px high. **Escape** exits cinematic before clearing a selection. Hidden controls are inert.
+- **Reset view** restores Orbit mode, the home camera and all sectors, without resetting simulation time. **Escape** closes About first, or conceals the exploration drawer without discarding selection.
+- **Return to scene** conceals the tools without changing simulation, camera, selection or quality. Focus returns to the title. Its hit target exceeds 44px on mobile; a hover/keyboard-focus hint explains the disclosure without permanent extra chrome.
 - **Render quality** independently selects Mobile, Desktop, or Cinematic. Narrow viewports default to Mobile; an explicit preference is remembered locally. Quality changes ray resolution and trail detail, **never the graph or note population**.
 - **Pause motion** freezes note positions, edges and orbital exposures. `prefers-reduced-motion` starts paused and disables automatic camera approaches. The frozen opening still has the complete luminous disk. Deliberate Orbit/Fly navigation remains available while paused; Resume opts back into simulation motion.
-- Sector controls have native keyboard activation, pressed states, focus indicators and a skip link. Mobile controls remain at least 44px high; the inspector expands below the scene.
+- Sector controls have native keyboard activation, pressed states, focus indicators and a skip link that opens the drawer. Mobile tools use a scrollable bottom sheet; the scene always remains one viewport tall, even during inspection.
 - If WebGL2/float targets cannot start, a shader fails (including after a quality change), depth readback fails, or the context is lost, **accessible topology mode** stops rendering and preserves the complete sector/node index. Missing or invalid data fails closed with a retry message.
 
 ## What the picture means

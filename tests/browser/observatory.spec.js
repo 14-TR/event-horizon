@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { openTools } from './tools.js';
 import { makeFixture } from '../fixture.js';
 
 async function loadFixture(page, fixture = makeFixture()) {
   await page.route('**/graph.json', route => route.fulfill({ json: fixture }));
   await page.goto('./');
+  await openTools(page);
 }
 
 test('loads a cinematic observatory with truthful anonymous topology', async ({ page }) => {
@@ -47,7 +49,7 @@ test('reduced motion starts paused and orbit, zoom, resume and reset are real', 
   await loadFixture(page);
   const canvas = page.locator('#observatory canvas');
   // Element screenshots include overlapping DOM. Hide HUD to compare 3D frames.
-  const frame = () => canvas.screenshot({ style: '#app > :not(.observatory) { visibility: hidden !important; }' });
+  const frame = () => canvas.screenshot({ style: '.intro, #explore-tools, [data-hud], .vignette { visibility: hidden !important; }' });
   await expect(page.getByRole('button', { name: 'Resume motion', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const before = await frame();
   await page.mouse.move(790, 410);
