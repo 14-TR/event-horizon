@@ -1,6 +1,6 @@
 # Event Horizon
 
-A cinematic, interactive observatory of a second brain’s connection topology. An orange-gold accretion disk and gravitationally lensed arc surround a black center; separate numbered constellations orbit beyond it.
+A cinematic, interactive observatory of a second brain’s connection topology. Actual anonymous note stars spiral through 3D space toward an orange-gold black hole. Orbit a constellation or fly freely among its moving stars.
 
 Built with **Vite, Three.js, and plain JavaScript**. All artwork is procedural. Fonts are local system fonts. There are no remote textures, font services, analytics, or runtime third-party requests.
 
@@ -28,18 +28,21 @@ The production base is **`/event-horizon/`**, suitable for a GitHub Pages projec
 
 ## Explore
 
-- **Drag** to orbit in 3D; **scroll or pinch** to zoom. Right-drag pans.
-- Select a **sector button or orbital label** to isolate and approach its constellation. Selecting an active sector again clears isolation.
+- **Orbit mode:** drag to orbit in 3D; **scroll or pinch** to zoom. Right-drag pans.
+- **Fly mode:** **WASD** moves forward/back/left/right relative to your view; **Q / E** moves down/up. **Drag** on the sky to look around. The six visible **hold-to-move thrust buttons** also work with touch or Space/Enter. Releasing or cancelling input stops movement immediately; changing tabs or losing focus clears held inputs. Flight stays within the starfield and outside the central horizon.
+- Select a **sector button or orbital label** to isolate and approach its constellation in tracking Orbit mode. The camera follows that sector's moving center, so inspection remains useful during infall. Selecting an active sector again clears isolation. Switching to Fly releases tracking without clearing the selected sector.
 - **Click a colored star** to inspect an anonymous node ID and its total unique neighbors, including connections outside the displayed sample and sector.
 - The native **anonymous node selector** offers the same inspection path without pointer picking.
-- **Reset view** restores the home camera and all sectors. **Escape** clears the selection, or closes the About dialog when it is open.
-- **Pause motion** freezes orbital and shader animation. The system’s `prefers-reduced-motion` setting starts the scene paused and disables camera fly-to animation.
+- **Reset view** restores Orbit mode, the home camera and all sectors. **Escape** clears the selection, or closes the About dialog when it is open.
+- **Pause motion** freezes the note positions, their edges, and shader animation. The system’s `prefers-reduced-motion` setting starts the scene paused and disables automatic camera approaches. Deliberate Orbit/Fly navigation remains available while paused; Resume opts back into simulation motion.
 - Sector controls have native keyboard activation, pressed states, focus indicators, and a skip link. Mobile controls remain at least 44px high; the inspector expands below the scene.
 - If WebGL cannot start or its context is lost, **accessible topology mode** preserves sector and node inspection. Missing or invalid data fails closed with a retry message.
 
 ## What the picture means
 
 Colored stars are notes, and the drawn constellation lines are **real within-sector connections**. Cross-sector links are included in the full graph and node neighbor counts but are not drawn, preserving separation between constellations. The central black hole, gold particle dust, and background starfield are decorative—not additional notes or links.
+
+**Infall is a visual simulation, not data destruction.** The actual sampled node coordinates spiral inward, turn faster near the center and stretch into tidal streams. Each sector completes a deterministic repeating loop (42–70 seconds for the current eight sectors), then its same notes return to the outer orbit. IDs, sector membership, topology and counts never change. This is an art-directed animation, not a numerical gravity model or a representation of changing knowledge. GPU star positions, drawn edge endpoints, raycasting, markers and inspection reticles all use the updated coordinates.
 
 Sector membership comes from the supplied export. The current export uses anonymized folder-derived sectors, **not inferred semantic communities**. All displayed sector labels are generated as `Sector 01`, `Sector 02`, and so on. Coordinates, sizes, colors, and black-hole lensing are artistic, not physical or semantic measurements. The procedural lens is an art-directed camera-facing shader inside the real Three.js scene, not a general-relativity simulation.
 
@@ -85,6 +88,8 @@ The browser’s allowlist is also **not** the publication boundary. Any extra pr
 
 - `src/graph.js` — anonymous schema boundary and deterministic bounded sampling
 - `src/layout.js` — seeded 3D orbital placement and sector colors
+- `src/motion.js` — deterministic, time-driven note infall and non-destructive recycling
+- `src/flight.js` — free camera movement, drag-look and held-input lifecycle
 - `src/shaders.js` — procedural lens, accretion disk, and luminous point shaders
 - `src/scene.js` — Three.js scene, camera controls, raycasting, isolation, lifecycle
 - `src/main.js` — accessible UI, counts, loading/error/fallback states

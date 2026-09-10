@@ -112,6 +112,17 @@
   .view-controls { display: flex; align-items: center; padding: 2px 9px; border: 1px solid #c2c8d022; border-radius: 5px; background: #0c0f15a0; backdrop-filter: blur(16px); }
   .view-controls button { height: 44px; min-width: 132px; font-size: 10px; color: #b9bec3; padding: 0 13px; border-radius: 3px; }
   .view-controls button:hover { color: #fff; background: #ffffff07; }
+  .navigation-controls { position: absolute; top: 110px; left: 52%; transform: translateX(-50%); text-align: center; width: 300px; pointer-events: none; }
+  .navigation-modes { display: inline-flex; padding: 3px; pointer-events: auto; background: #0c1018b0; }
+  .navigation-modes button { min-height: 44px; min-width: 90px; font-size: 11px; border-radius: 3px; color: #a6afb9; }
+  .navigation-modes button[aria-pressed="true"] { color: #eed0a8; background: #e2b77818; }
+  #flight-help { margin-top: 9px; font: 9px/1.8 var(--mono); color: #a6afb9; text-shadow: 0 1px 5px #000; }
+  #flight-help strong { font-weight: 400; color: #e4caa6; }
+  #app[data-navigation="fly"] canvas { cursor: crosshair; }
+  .flight-pad { position: absolute; bottom: 154px; left: 52%; transform: translateX(-50%); display: flex; gap: 4px; padding: 5px; background: #0c1018c0; }
+  .flight-pad button { min-width: 44px; min-height: 48px; font: 17px/1.1 var(--mono); touch-action: none; user-select: none; border-radius: 3px; }
+  .flight-pad button small { display: block; font: 6px/1.5 var(--mono); letter-spacing: .05em; margin-top: 3px; color: #a6afb9; }
+  .flight-pad button:active { background: #e2b77830; }
   .view-controls button > span:first-child { font-size: 15px; margin-right: 9px; color: #adb3ba; }
   .control-divider { width: 1px; height: 17px; background: var(--line); }
   .render-stat { justify-self: end; display: flex; flex-direction: column; text-align: right; }
@@ -190,6 +201,8 @@
     .panel-foot { height: 30px; margin-top: 5px; font-size: 6px; }
     .panel-heading .eyebrow { font-size: 7px; }
     .inspector { display: none; }
+    .navigation-controls { top: 293px; left: 50%; }
+    .flight-pad { top: 476px; bottom: auto; left: 50%; gap: 1px; }
     #app[data-selected="true"] { min-height: 1160px; }
     #app[data-selected="true"] .observatory { height: 880px; bottom: auto; }
     #app[data-selected="true"] .inspector { display: block; bottom: 345px; left: 22px; right: 22px; width: auto; padding: 20px; }

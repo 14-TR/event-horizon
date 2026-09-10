@@ -10,7 +10,7 @@
 </head>
 <body>
   <a class="skip-link" href="#sector-list">Skip to sector controls</a>
-  <div id="app" data-state="loading">
+  <div id="app" data-state="loading" data-navigation="orbit">
     <div id="observatory" class="observatory" data-renderer="pending"></div>
     <div class="vignette" aria-hidden="true"></div>
     <div class="film-grain" aria-hidden="true"></div>
@@ -61,6 +61,21 @@
         <p class="privacy-note">Anonymous IDs. No titles. No content.</p>
       </aside>
 
+      <div class="navigation-controls" aria-label="Camera navigation">
+        <div class="navigation-modes glass" role="group" aria-label="Navigation mode">
+          <button id="orbit-button" aria-label="Orbit mode" aria-pressed="true" disabled>⊙ Orbit</button>
+          <button id="fly-button" aria-label="Fly mode" aria-pressed="false" disabled>↗ Fly</button>
+        </div>
+        <p id="flight-help" hidden><strong>WASD</strong> move · <strong>Q / E</strong> down / up<br>Drag to look · hold the thrust buttons.<br>Pause freezes stars, not your controls.</p>
+      </div>
+      <div id="flight-pad" class="flight-pad glass" role="group" aria-label="Flight thrust controls" hidden>
+        <button data-flight="left" aria-label="Fly left">←<small>LEFT</small></button>
+        <button data-flight="forward" aria-label="Fly forward">↑<small>FWD</small></button>
+        <button data-flight="back" aria-label="Fly back">↓<small>BACK</small></button>
+        <button data-flight="right" aria-label="Fly right">→<small>RIGHT</small></button>
+        <button data-flight="down" aria-label="Fly down">−<small>DOWN</small></button>
+        <button data-flight="up" aria-label="Fly up">+<small>UP</small></button>
+      </div>
       <div class="loading-notice" id="loading-notice" role="status"><span class="loading-orbit"></span>Resolving the constellation…</div>
       <div id="fallback" class="fallback glass" hidden><p class="eyebrow">SIGNAL UNAVAILABLE</p><h2 id="fallback-title">The observatory is offline.</h2><p id="fallback-description"></p><button id="retry-button" class="text-button">Try again</button></div>
       <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
@@ -73,7 +88,7 @@
     </div>
     <footer><span>THE STRUCTURE REMAINS. THE STORIES STAY PRIVATE.</span><span class="footer-right">TR INGRAM<span>·</span>EVENT HORIZON / 01</span></footer>
   </div>
-  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Positions and the black hole are artistic, not a physical simulation. The black hole, dust, and background stars are decoration; colored sector stars represent notes. Only real within-sector connections are drawn. A bounded sample keeps the observatory responsive.</p><p>Drag to orbit, scroll or pinch to zoom, and select a sector to isolate it. Use sector buttons and the node selector for keyboard exploration. Escape clears a selection. Motion respects your system’s reduced-motion preference.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
+  <dialog id="about-dialog" class="about-dialog glass" aria-labelledby="about-title"><button id="close-about" class="icon-button close-dialog" aria-label="Close about dialog">×</button><p class="eyebrow">ABOUT THE OBSERVATORY</p><h2 id="about-title">Structure, not stories.</h2><p>Event Horizon is an abstract map of connections between notes. Sectors are numbered, nodes use anonymous IDs, and no titles, text, paths, or semantic labels are displayed.</p><p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p><p>Colored stars are actual sampled notes spiraling inward through 3D space. Each sector returns to its outer orbit on a repeating visual loop: no notes or connections are deleted. The paths and black hole are artistic, not a physical simulation. Gold dust and background stars are decoration. Only real within-sector connections are drawn, with endpoints following the moving notes.</p><p>In Orbit, drag to orbit and scroll or pinch to zoom. Select a sector to isolate and follow it. In Fly, use WASD to move, Q/E for down/up, and drag to look; touch users can hold the six thrust buttons. Selecting a sector returns to tracking Orbit. Reset view restores the home camera. Escape clears a selection. Pause and reduced motion freeze the simulation; deliberate camera controls still work.</p><button id="close-about-done" class="text-button">Return to the observatory <span aria-hidden="true">↗</span></button></dialog>
   <noscript><div class="noscript-notice">Event Horizon needs JavaScript for its 3D observatory. This site contains anonymous connection topology, not note titles or content.</div></noscript>
   <script type="module" src="/src/main.js"></script>
 </body>

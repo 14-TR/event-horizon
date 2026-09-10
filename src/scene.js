@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildLayout } from './layout.js';
+import { createInfall } from './motion.js';
+import { FlightControls } from './flight.js';
 import { blackHoleVertex, blackHoleFragment, pointVertex, pointFragment } from './shaders.js';
 
 /** All artwork is generated locally. No textures, fonts or network services. */
@@ -9,6 +11,7 @@ export class Observatory {
     this.host = host;
     this.graph = graph;
     this.layout = buildLayout(graph);
+    this.infall = createInfall(this.layout);
     this.paused = paused;
     this.onProject = onProject;
     this.time = 0;
@@ -18,8 +21,9 @@ export class Observatory {
     this.renderer.setClearColor(0x030407, 1);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge observatory. Drag to orbit; scroll to zoom. Sector and node controls are available alongside.');
+    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge observatory. Orbit: drag and scroll. Fly: WASD moves, Q/E down/up, drag to look. Sector and node controls are available alongside.');
     this.renderer.domElement.setAttribute('role', 'img');
+    this.renderer.domElement.tabIndex = 0;
     host.append(this.renderer.domElement);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !paused;
@@ -37,11 +41,14 @@ export class Observatory {
     this.controls.update();
     this.controls.saveState();
     this.orbital = new THREE.Group();
+    this.navigationMode = 'orbit';
+    this.flyControls = new FlightControls(this.camera, this.renderer.domElement);
     this.scene.add(this.orbital);
     this.clusterObjects = new Map();
     this.addStars();
     this.addBlackHole();
     this.addConstellations();
+    this.updateInfall(0);
     this.pointerAbort = new AbortController();
     const canvas = this.renderer.domElement;
     const signal = this.pointerAbort.signal;
@@ -128,7 +135,7 @@ export class Observatory {
       if (this.visibleEdgeCount >= 8000) break;
       const na = positions.get(a), nb = positions.get(b);
       if (na && nb && na.cluster === nb.cluster) {
-        sectorEdges.get(na.cluster).push(...na.position, ...nb.position);
+        sectorEdges.get(na.cluster).push(na, nb);
         this.visibleEdgeCount++;
       }
     }
@@ -147,11 +154,37 @@ export class Observatory {
       group.add(points);
       const lines = sectorEdges.get(cluster.id);
       const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(lines.flatMap(node => node.position), 3));
+      points.geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
+      geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
       const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.14, depthWrite: false }));
       group.add(line);
       this.orbital.add(group);
-      this.clusterObjects.set(cluster.id, { group, points, line, cluster });
+      this.clusterObjects.set(cluster.id, { group, points, line, cluster, edgeNodes: lines });
+    }
+  }
+
+  updateInfall(time) {
+    const tracked = this.navigationMode === 'orbit' && this.layout.clusters.find(cluster => cluster.id === this.selectedCluster);
+    const previous = tracked ? new THREE.Vector3(...tracked.center) : null;
+    this.infall(time);
+    if (tracked) {
+      const shift = new THREE.Vector3(...tracked.center).sub(previous);
+      this.camera.position.add(shift);
+      this.controls.target.add(shift);
+      if (this.flight) {
+        for (const key of ['fromPosition', 'fromTarget', 'position', 'target']) this.flight[key].add(shift);
+      }
+    }
+    for (const { points, line, edgeNodes } of this.clusterObjects.values()) {
+      const positions = points.geometry.attributes.position;
+      points.userData.nodes.forEach((node, index) => positions.setXYZ(index, ...node.position));
+      positions.needsUpdate = true;
+      points.geometry.computeBoundingSphere(); // Raycasting and culling must move too.
+      const endpoints = line.geometry.attributes.position;
+      edgeNodes.forEach((node, index) => endpoints.setXYZ(index, ...node.position));
+      endpoints.needsUpdate = true;
+      line.geometry.computeBoundingSphere();
     }
   }
 
@@ -173,6 +206,18 @@ export class Observatory {
     if (value) this.flight = null;
   }
 
+  setNavigationMode(mode) {
+    this.navigationMode = mode;
+    this.flight = null;
+    this.controls.enabled = mode === 'orbit';
+    this.flyControls.setEnabled(mode === 'fly');
+    if (mode === 'orbit') {
+      const target = this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(13).add(this.camera.position);
+      this.controls.target.copy(target);
+      this.controls.update();
+    }
+  }
+
   selectCluster(id) {
     this.selectedCluster = id;
     this.selectedNode = null;
@@ -180,6 +225,7 @@ export class Observatory {
       objects.group.visible = id === null || id === clusterId;
     }
     if (id === null) {
+      this.setNavigationMode('orbit');
       this.flight = null;
       this.controls.reset();
       this.camera.position.copy(this.homePosition);
@@ -229,8 +275,7 @@ export class Observatory {
     this.lastTime = now;
     if (!this.paused && !document.hidden) {
       this.time += delta;
-      this.orbital.rotation.y = Math.sin(this.time * 0.016) * 0.13;
-      this.orbital.rotation.z = this.time * 0.007;
+      this.updateInfall(this.time);
       this.dust.rotation.y += delta * 0.032;
     }
     if (this.flight) {
@@ -240,7 +285,8 @@ export class Observatory {
       this.controls.target.lerpVectors(this.flight.fromTarget, this.flight.target, ease);
       if (t === 1) this.flight = null;
     }
-    this.controls.update();
+    if (this.navigationMode === 'fly') this.flyControls.update(delta);
+    else this.controls.update();
     this.hole.quaternion.copy(this.camera.quaternion);
     this.hole.material.uniforms.uTime.value = this.time;
     this.hole.material.uniforms.uInclination.value = THREE.MathUtils.clamp(0.2 + Math.abs(this.camera.position.y) * 0.006, 0.2, 0.68);
@@ -254,6 +300,7 @@ export class Observatory {
     this.observer.disconnect();
     this.pointerAbort.abort();
     this.controls.dispose();
+    this.flyControls.dispose();
     this.scene.traverse(object => {
       object.geometry?.dispose();
       if (object.material) object.material.dispose();

@@ -12,6 +12,7 @@ let sampled;
 let paused = motionQuery.matches;
 let selectedCluster = null;
 let selectedNode = null;
+let navigationMode = 'orbit';
 const adjacency = new Map();
 const markers = new Map();
 
@@ -31,6 +32,7 @@ function inspectNode(id) {
 }
 
 function selectCluster(id) {
+  setNavigationMode('orbit');
   selectedCluster = id;
   inspectNode(null);
   scene?.selectCluster(id);
@@ -101,6 +103,9 @@ function renderSectors() {
 function showWebGLFallback() {
   scene?.dispose();
   scene = undefined;
+  setNavigationMode('orbit');
+  $('orbit-button').disabled = true;
+  $('fly-button').disabled = true;
   $('observatory').replaceChildren();
   $('observatory').dataset.renderer = 'fallback';
   $('cluster-markers').hidden = true;
@@ -151,6 +156,8 @@ async function init() {
         if (nodePosition) $('node-reticle').style.transform = `translate(${nodePosition.x - 13}px, ${nodePosition.y - 13}px)`;
       },
     });
+    $('orbit-button').disabled = false;
+    $('fly-button').disabled = false;
   } catch {
     showWebGLFallback();
   }
@@ -165,9 +172,38 @@ function setPaused(value) {
   $('pause-button').setAttribute('aria-label', paused ? 'Resume motion' : 'Pause motion');
   $('pause-label').textContent = paused ? 'Resume motion' : 'Pause motion';
   $('pause-icon').textContent = paused ? '▷' : 'Ⅱ';
-  $('view-state').textContent = paused ? 'MOTION PAUSED' : 'LIVE ORBIT';
+  $('view-state').textContent = paused ? 'MOTION PAUSED' : navigationMode === 'fly' ? 'LIVE FLIGHT' : 'LIVE ORBIT';
 }
 
+function setNavigationMode(mode) {
+  navigationMode = mode;
+  scene?.setNavigationMode(mode);
+  $('app').dataset.navigation = mode;
+  $('orbit-button').setAttribute('aria-pressed', String(mode === 'orbit'));
+  $('fly-button').setAttribute('aria-pressed', String(mode === 'fly'));
+  $('flight-help').hidden = mode !== 'fly';
+  $('flight-pad').hidden = mode !== 'fly';
+  if (scene) $('view-state').textContent = paused ? 'MOTION PAUSED' : mode === 'fly' ? 'LIVE FLIGHT' : 'LIVE ORBIT';
+}
+
+$('orbit-button').addEventListener('click', () => setNavigationMode('orbit'));
+for (const button of document.querySelectorAll('[data-flight]')) {
+  const stop = () => scene?.flyControls.thrust.delete(button.dataset.flight);
+  button.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    scene?.flyControls.thrust.add(button.dataset.flight);
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur']) button.addEventListener(type, stop);
+  button.addEventListener('keydown', event => {
+    if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); scene?.flyControls.thrust.add(button.dataset.flight); }
+  });
+  button.addEventListener('keyup', stop);
+}
+$('fly-button').addEventListener('click', () => {
+  setNavigationMode('fly');
+  $('observatory').querySelector('canvas')?.focus({ preventScroll: true });
+});
 $('pause-button').addEventListener('click', () => setPaused(!paused));
 motionQuery.addEventListener('change', event => setPaused(event.matches));
 setPaused(paused);
