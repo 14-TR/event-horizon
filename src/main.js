@@ -76,7 +76,7 @@ function selectCluster(id) {
   $('selection-title').textContent = cluster?.label || 'The whole, connected.';
   $('selection-description').textContent = cluster
     ? `${format(cluster.count)} notes in this disk stream. Select a star, or choose an anonymous ID below.`
-    : 'Every point of light in the disk is a note. Isolate a colored stream to explore its connections.';
+    : 'Every star in the disk is a note. Warped arcs repeat their light. Isolate a colored stream to explore its connections.';
   if (cluster) {
     const nodes = graph.nodes.filter(node => node.cluster === id);
     const select = $('node-select');

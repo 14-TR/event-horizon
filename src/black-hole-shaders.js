@@ -20,6 +20,9 @@ export const rayFragment = /* glsl */ `
   uniform float uLensing;
   uniform float uStars;
   uniform float uDust;
+  uniform sampler2D uDiskImage;
+  uniform float uDiskExtent;
+  uniform float uDiskEnabled;
 
   const float DOMAIN = 36.0;
   const float INNER = 3.05;
@@ -122,6 +125,8 @@ export const rayFragment = /* glsl */ `
     float b = dot(p, v);
     float discriminant = b * b - dot(p, p) + DOMAIN * DOMAIN;
     vec3 radiance = vec3(0);
+    vec2 noteUv = vec2(-1.0);
+    float noteWeight = 0.0;
     float transmission = 1.0;
     float firstDepth = NO_HIT;
     bool escaped = false;
@@ -142,10 +147,29 @@ export const rayFragment = /* glsl */ `
         vec3 halfVelocity = v + acceleration(p, h2) * (0.5 * dt);
         vec3 next = p + halfVelocity * dt;
 
+        // Strongly bent note images: intersect the ray with the real
+        // disk exposure AFTER periapsis. Direct foreground stars stay 3D.
+        // Thin-plane approximation deliberately collapses the shallow warp.
+        if (uDiskEnabled > 0.0 && p.y * next.y < 0.0) {
+          vec3 hit = mix(p, next, -p.y / (next.y - p.y));
+          if (dot(hit, halfVelocity) > 0.0) {
+            vec3 worldHit = (uHoleToWorld * vec4(hit, 1.0)).xyz;
+            vec2 uv = worldHit.xz / (2.0 * uDiskExtent) + 0.5;
+            if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
+              vec3 tangent = normalize(vec3(-hit.z, 0.0, hit.x));
+              float highlight = 1.0 + 0.22 * dot(tangent, -normalize(halfVelocity));
+              float secondary = smoothstep(0.04, 0.18, 1.0 - dot(initial, normalize(halfVelocity)));
+              noteUv = uv;
+              // Fade weakly bent primary light; ordinary stars are drawn later.
+              noteWeight = 1.65 * highlight * secondary;
+            }
+          }
+        }
+
         // Intersect the whole integration segment with a finite world-space
         // slab. This avoids missing a thin disk with larger mobile steps.
         // Optional supporting dust only. The observatory disables it: every
-        // luminous disk star is a real note, rendered directly after this pass.
+        // luminous disk star is a real note, with secondary light sampled above.
         if (uDust > 0.0 && min(p.y, next.y) < THICKNESS && max(p.y, next.y) > -THICKNESS) {
           float dy = next.y - p.y;
           float enter = 0.0, leave = 1.0;
@@ -178,6 +202,13 @@ export const rayFragment = /* glsl */ `
     vec3 worldEscape = normalize((uHoleToWorld * vec4(normalize(v), 0)).xyz);
     vec3 background = sky(worldEscape); // derivatives evaluated for all pixels
     if (escaped) radiance += transmission * background;
+    // One texture lookup OUTSIDE the integration loop: no divergent texture
+    // fetches on every ray step, and no synthetic fill between note images.
+    if (uDiskEnabled > 0.0 && noteWeight > 0.0 && escaped) {
+      radiance += textureLod(uDiskImage, noteUv, 0.5).rgb * noteWeight;
+    }
+    // No reflective surface or light painted into the absorbing center.
+    if (captured) radiance = vec3(0.0);
     // Signed ray-depth: negative marks capture for shadow-preserving glow.
     outColor = vec4(radiance, captured ? -firstDepth : firstDepth);
   }

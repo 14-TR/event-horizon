@@ -33,7 +33,7 @@ The production base is **`/event-horizon/`**, suitable for a GitHub Pages projec
 - **Orbit mode:** drag to orbit in 3D; **scroll or pinch** to zoom. Right-drag pans.
 - **Fly mode:** **WASD** moves forward/back/left/right relative to your view; **Q / E** moves down/up. **Drag** on the sky to look around. The six **hold-to-move thrust buttons** also work with touch or Space/Enter. Releasing or cancelling input stops movement immediately; changing tabs or losing focus clears held inputs. Flight stays within the scene and outside the central horizon.
 - Select a **sector button** to isolate its colored stream within the same disk. Its real within-sector connections become visible. Large streams keep the disk-wide view; tiny sectors are approached for inspection. Orbit follows the selected sector’s center. Selecting an active sector again clears isolation. Switching to Fly releases tracking without clearing the selected stream.
-- **Click a colored star** to inspect its anonymous ID and total unique neighbors, including connections outside the isolated sector. Picking and selected reticles use the same approximate depth as the black-hole image.
+- **Click a direct colored star** to inspect its anonymous ID and total unique neighbors, including connections outside the isolated sector. Picking and selected reticles use the same approximate depth as the black-hole image. **Warped arcs are noninteractive repeated light**, not extra notes or independently pickable stars; use the direct star or the complete ID selector.
 - The native **anonymous node selector** includes every node in that sector, providing the same data inspection without pointer picking. No IDs are truncated by a display cap.
 - **Reset view** restores Orbit mode, the home camera and all sectors, without resetting simulation time. **Escape** clears the selection, or closes the About dialog when open.
 - **Cinematic view** hides the HUD without changing simulation or quality. A persistent **Exit cinematic view** button remains visible, focused, keyboard/touch accessible, and at least 44px high. **Escape** exits cinematic before clearing a selection. Hidden controls are inert.
@@ -60,7 +60,11 @@ Short trails are **orbital exposures of those exact notes**, not extra stars or 
 
 The dim background sky is **separate decorative artwork, not additional notes**. The fixed world-space ray pass reconstructs the actual camera rays, bends them through a bounded central-potential approximation, and samples the escaping procedural sky. This preserves a dark capture silhouette and view-dependent lensed sky. It is **not a full general-relativity simulation**.
 
-**Note images are not physically lensed.** Note-stars remain ordinary, directly rendered 3D graph objects. The ray pass writes approximate capture depth; picking and reticles read that same depth so hidden stars cannot be selected through the horizon. Foreground stars can cross in front of the black core. Nearest-pixel occlusion and silhouette boundaries remain approximate.
+**The actual note light now bends around the shadow.** A second, fixed world-XZ render pass captures the *same live position, color, size and trail geometry buffers* into a linear-HDR disk image. It excludes graph edges, sky, gas and UI. The existing bent rays intersect that image on their outgoing path after closest approach, producing far-side upper/lower arcs and a narrow photon-like inner image. Removing or isolating source notes removes their light from the arcs; changing the camera changes the ray intersections, not the orientation of a painted billboard. The capture is regenerated from the current exposure each frame, including while paused, without changing simulation time.
+
+This is an **explicit thin-disk lensing approximation, not physically exact images or a full relativistic transfer solution**. It flattens the disk's small vertical spread onto XZ and assigns fixed world-space sprite footprints; mip filtering softens very small sources. One outgoing disk-image lookup per ray is retained; weakly bent primary light fades out to avoid broadly duplicating the direct disk. The strongest primary images can still overlap direct stars. Higher-order images, true volumetric emission, time delays, energy-conserving magnification and exact redshift are not solved. Precisely edge-on alignment can produce nearly concentric Einstein-like arcs from a radial slice of the actual source image. Very narrow images can alias or change at a quality boundary. The subtle directional hot-light gain and thresholded glow are art direction, **not reflections from a metallic surface**. There is no source-independent luminous disk/rim fill.
+
+Direct note-stars remain ordinary 3D objects, so foreground stars and trails still pass in front of the black core. The ray pass keeps captured radiance black and writes approximate capture depth; picking and reticles read that same depth so hidden direct stars cannot be selected through the horizon. Image-only copies are held in a separate noninteractive capture scene, borrow graph geometry without owning IDs, and never enter picking or totals. Nearest-pixel occlusion and silhouette boundaries remain approximate.
 
 ### Connections and membership
 
@@ -70,13 +74,15 @@ Sector membership comes from the supplied export. The current export uses anonym
 
 ### Render budgets and truthful counts
 
-| Quality | Ray steps | Maximum ray pixels | Notes included | Trail segments per note |
-| --- | ---: | ---: | --- | ---: |
-| Mobile | 96 | 340,000 | All | 3 |
-| Desktop | 144 | 1,100,000 | All | 5 |
-| Cinematic | 192 | 2,100,000 | All | 7 |
+| Quality | Ray steps | Maximum ray pixels | Disk image | Notes included | Trail segments per note |
+| --- | ---: | ---: | --- | --- | ---: |
+| Mobile | 96 | 340,000 | 512 × 512 | All | 3 |
+| Desktop | 144 | 1,100,000 | 768 × 768 | All | 5 |
+| Cinematic | 192 | 2,100,000 | 1024 × 1024 | All | 7 |
 
 The ray target is independent of display DPR (ray DPR caps: 1 / 1 / 1.5). Foreground DPR is capped at 1.75. The full graph is retained without an overall or per-sector node cap. Every note has one point in a GPU buffer and one bounded trail entry; no quality preset samples a subset.
+
+Lensing adds one bounded RGBA16F source target with mipmaps (approximately **2.67 / 6 / 10.67 MiB** by quality), no depth target, and one extra draw per visible sector plus one trail draw (9 with the current 8-sector graph). It shares the existing vertex buffers instead of generating another node population. Only one source-image texture lookup occurs after ray integration, not inside the step loop. There are no new dependencies or network requests, and no full-frame CPU/GPU readback in the application.
 
 The reviewed topology contains **1,675 notes, 1,762 connections and 8 sectors**. Before isolation, both desktop and mobile report **1,675 / 1,675 notes in disk**. During isolation, the numerator is the selected stream’s complete population. These are included-note counts, **not on-screen pixel, visibility or occlusion counts**. The top totals always describe the complete validated graph. The inspector separately reports included/total sector notes. WebGL fallback reports zero rendered notes while retaining every ID in the accessible index. Future exports may change the totals.
 
@@ -84,7 +90,9 @@ The reviewed topology contains **1,675 notes, 1,762 connections and 8 sectors**.
 
 Unit tests read the actual public graph and require each of its 1,675 IDs to map exactly once into the bounded 3D disk. They check all quality presets’ actual point buffers, repeatability, unchanged input topology, whole-disk coverage through long/negative times, staggered recycling, exact pause, moving edge/picking coordinates and bounded per-note exposure history.
 
-`tests/browser/node-disk.spec.js` observes **real WebGL POINTS draw counts** for all three qualities on desktop/mobile, enumerates every sector’s complete ID selector, verifies the aggregate is exactly the actual 1,675 unique IDs, and checks tail-of-sector IDs and full neighbor counts beyond the former per-sector cap. It records JSON coverage receipts in `test-results/`.
+`tests/browser/node-disk.spec.js` separately observes **real WebGL POINTS draw counts in the direct view and disk-image framebuffer** for all three qualities on desktop/mobile, enumerates every sector’s complete ID selector, verifies the aggregate is exactly the actual 1,675 unique IDs, and checks tail-of-sector IDs and full neighbor counts beyond the former per-sector cap. It records JSON coverage receipts in `test-results/`. Unit tests require the capture to borrow every actual point/trail buffer, retain one-to-one source identity, and leave borrowed geometry alive on disposal.
+
+`tests/browser/disk-lensing.spec.js` renders a controlled far-side source through the real GPU passes at every quality. It requires light in both upper and lower shadow arcs, a zero-radiance center, color changes matching the source, view-dependent images, no source-free arcs and no duplicates with lens bending disabled. Diagnostic source images are test-only, not production data or additional notes.
 
 `tests/browser/render-acceptance.spec.js` records real-topology desktop/mobile/cinematic/above/edge/reverse/below/close-flight screenshots and bounded requestAnimationFrame pacing. Those measurements identify the actual GPU and are not physical-phone or Safari performance guarantees. GPU depth is additionally checked at DPR 1, 1.75 and 3. The selected-node reticle/picking one-pixel readback can add synchronization cost; the unselected scene does no pixel readback. Production browser tests also exercise WASD/QE, touch cancellation, orbit/reset, reduced motion, isolation, privacy, empty graphs and renderer failure fallbacks.
 
@@ -121,7 +129,8 @@ The browser’s allowlist is also **not** the publication boundary. Extra privat
 - `src/layout.js` — seeded all-node 3D spiral disk, shared trajectory and sector colors
 - `src/motion.js` — time-driven coordinates and non-destructive per-note recycling
 - `src/flight.js` — free camera movement, drag-look and held-input lifecycle
-- `src/black-hole.js`, `src/black-hole-shaders.js`, `src/black-hole-math.js` — bounded rays, lensed decorative sky, capture depth and quality budgets
+- `src/black-hole.js`, `src/black-hole-shaders.js`, `src/black-hole-math.js` — bounded rays, lensed source light and decorative sky, capture depth and quality budgets
+- `src/disk-radiance.js` — bounded disk-space HDR capture borrowing actual node/trail geometry; noninteractive secondary light
 - `src/star-trails.js` — bounded orbital exposures for every real note
 - `src/shaders.js` — luminous actual-node point shaders
 - `src/scene.js` — Three.js scene, controls, raycasting, isolation and lifecycle

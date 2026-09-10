@@ -11,11 +11,13 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     // Observe real WebGL POINTS draw calls, not just the UI's claimed population.
     await page.addInitScript(() => {
       window.noteDraws = [];
+      window.diskDraws = [];
       const original = WebGL2RenderingContext.prototype.drawArrays;
       WebGL2RenderingContext.prototype.drawArrays = function (mode, first, count) {
         if (mode === this.POINTS) {
-          window.noteDraws.push(count);
-          if (window.noteDraws.length > 64) window.noteDraws.shift();
+          const draws = this.getParameter(this.FRAMEBUFFER_BINDING) ? window.diskDraws : window.noteDraws;
+          draws.push(count);
+          if (draws.length > 64) draws.shift();
         }
         return original.call(this, mode, first, count);
       };
@@ -32,12 +34,17 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const receipt = { viewport, qualities: [], sectors: [] };
     for (const quality of ['mobile', 'desktop', 'cinematic']) {
       await page.getByLabel('Render quality').selectOption(quality);
+      await expect(host).toHaveAttribute('data-disk-source-stars', String(graph.nodes.length));
+      await expect(host).toHaveAttribute('data-lensed-light', 'noninteractive');
+      await expect(host).toHaveAttribute('data-disk-image-size', String({ mobile: 512, desktop: 768, cinematic: 1024 }[quality]));
       await expect(host).toHaveAttribute('data-note-stars', String(graph.nodes.length));
       await expect(host).toHaveAttribute('data-trail-stars', String(graph.nodes.length));
       await expect(page.locator('#render-count')).toHaveText(`${fmt(graph.nodes.length)} / ${fmt(graph.nodes.length)}`);
       const counts = await draws(graph.clusters.length);
       expect(counts).toEqual(expectedCounts);
-      receipt.qualities.push({ quality, gpuPointCount: counts.reduce((sum, n) => sum + n, 0), draws: counts });
+      const sourceCounts = await page.evaluate(count => window.diskDraws.slice(-count).sort((a, b) => a - b), graph.clusters.length);
+      expect(sourceCounts).toEqual(expectedCounts);
+      receipt.qualities.push({ quality, gpuPointCount: counts.reduce((sum, n) => sum + n, 0), draws: counts, diskSourceDraws: sourceCounts });
     }
     const enumerated = [];
     for (const cluster of graph.clusters) {

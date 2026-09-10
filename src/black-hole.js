@@ -30,6 +30,7 @@ export class BlackHoleRenderer {
       uWorldScale: { value: horizonRadius },
       uTime: { value: 0 }, uStepScale: { value: this.settings.stepScale },
       uLensing: { value: 1 }, uStars: { value: 0.28 }, uDust: { value: 0 },
+      uDiskImage: { value: null }, uDiskExtent: { value: 1 }, uDiskEnabled: { value: 0 },
       uImage: { value: this.target.texture },
       uTexel: { value: new THREE.Vector2(1, 1) },
       uExposure: { value: exposure }, uGlow: { value: glow },
@@ -96,6 +97,14 @@ export class BlackHoleRenderer {
     this.uniforms.uTime.value = timeSeconds;
   }
 
+  /** Borrow a source exposure. The owner retains its geometry and lifecycle. */
+  setDiskRadiance(source) {
+    this.diskRadiance = source;
+    this.uniforms.uDiskImage.value = source?.target.texture ?? null;
+    this.uniforms.uDiskExtent.value = source?.extent ?? 1;
+    this.uniforms.uDiskEnabled.value = source ? 1 : 0;
+  }
+
   /** Full-frame replacement for renderer.render(scene, camera); preserves renderer state. */
   render(renderer, camera, timeSeconds, foregroundScene = null) {
     if (!renderer.extensions.has('EXT_color_buffer_float')) {
@@ -109,6 +118,7 @@ export class BlackHoleRenderer {
     try {
       renderer.autoClear = false;
       renderer.setScissorTest(false);
+      this.diskRadiance?.render(renderer);
       renderer.setRenderTarget(this.target);
       // setRenderTarget applies its physical-pixel viewport. setViewport would apply DPR twice.
       renderer.render(this.rayScene, this.passCamera);

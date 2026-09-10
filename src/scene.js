@@ -6,8 +6,9 @@ import { FlightControls } from './flight.js';
 import { pointVertex, pointFragment } from './shaders.js';
 import { BlackHoleRenderer } from './black-hole.js';
 import { StarTrails } from './star-trails.js';
+import { DiskRadiance } from './disk-radiance.js';
 
-/** All artwork is generated locally. No textures, fonts or network services. */
+/** All artwork is generated locally. No external textures, fonts or network services. */
 export class Observatory {
   constructor(host, graph, { paused = false, quality = host.clientWidth < 700 ? 'mobile' : 'desktop', onProject = () => {}, onPick = () => {}, onUnavailable = () => {} } = {}) {
     this.host = host;
@@ -31,7 +32,7 @@ export class Observatory {
     this.renderer.setClearColor(0x030407, 1);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge observatory. Orbit: drag and scroll. Fly: WASD moves, Q/E down/up, drag to look. Sector and node controls are available alongside.');
+    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge observatory. Orbit: drag and scroll. Fly: WASD moves, Q/E down/up, drag to look. Warped arcs are noninteractive repeated note light. Inspect direct stars or use the complete sector and node controls alongside.');
     this.renderer.domElement.setAttribute('role', 'img');
     this.renderer.domElement.tabIndex = 0;
     host.append(this.renderer.domElement);
@@ -142,12 +143,18 @@ export class Observatory {
   }
 
   addTrails() {
+    this.diskRadiance?.dispose();
     if (this.trails) { this.orbital.remove(this.trails.mesh); this.trails.dispose(); }
     this.trails = new StarTrails(this.layout, this.quality);
     this.trails.selectedCluster = this.selectedCluster ?? null;
     this.orbital.add(this.trails.mesh);
     this.trails.update(this.time);
     this.reportTrails();
+    this.diskRadiance = new DiskRadiance([...this.clusterObjects.values()].map(({ points }) => points), this.trails.mesh, this.quality);
+    this.blackHole.setDiskRadiance(this.diskRadiance);
+    this.host.dataset.diskSourceStars = String(this.diskRadiance.noteCount);
+    this.host.dataset.diskImageSize = String(this.diskRadiance.target.width);
+    this.host.dataset.lensedLight = 'noninteractive';
   }
 
   reportTrails() {
@@ -337,6 +344,7 @@ export class Observatory {
     this.pointerAbort.abort();
     this.controls.dispose();
     this.flyControls.dispose();
+    this.diskRadiance.dispose();
     this.scene.traverse(object => {
       object.geometry?.dispose();
       if (object.material) object.material.dispose();
