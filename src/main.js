@@ -2,11 +2,17 @@ import './style.css';
 import { parseGraph } from './graph.js';
 import { SECTOR_COLORS } from './layout.js';
 import { Observatory } from './scene.js';
+import { createExploration, connectionPreview } from './exploration.js';
+import { locateSelection } from './inspection-space.js';
+import { bindFlightPad } from './flight-pad.js';
 
 const $ = id => document.getElementById(id);
 const format = value => new Intl.NumberFormat('en-US').format(value);
 const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+const narrowQuery = matchMedia('(max-width: 700px)');
+$('neighbor-explorer').open = !narrowQuery.matches;
 let scene;
+let flightPad;
 let graph;
 let paused = motionQuery.matches;
 let selectedCluster = null;
@@ -23,6 +29,7 @@ const hud = [...document.querySelectorAll('[data-hud]')];
 
 function setCinematic(value, { focus = true } = {}) {
   cinematic = value;
+  flightPad?.clear();
   scene?.flyControls.clear();
   $('app').dataset.cinematic = String(value);
   for (const element of hud) element.inert = value;
@@ -34,10 +41,26 @@ function setCinematic(value, { focus = true } = {}) {
   if (focus) $('title-toggle').focus({ preventScroll: true });
 }
 $('cinematic-button').addEventListener('click', () => setCinematic(true));
+$('close-tools').addEventListener('click', () => setCinematic(true));
+function setToolsPanel(panel) {
+  $('explore-tools').dataset.panel = panel;
+  $('explore-tools').scrollTop = 0;
+}
+$('browse-button').addEventListener('click', () => {
+  setToolsPanel('browse');
+  $('sector-list').focus({ preventScroll: true });
+  $('sector-list').scrollIntoView({ block: 'nearest' });
+});
+$('resume-inspection').addEventListener('click', () => {
+  setToolsPanel('inspect');
+  $('node-select').focus({ preventScroll: true });
+  locateSelected({ compact: true });
+});
 $('title-toggle').addEventListener('click', () => setCinematic(!cinematic));
 document.querySelector('.skip-link').addEventListener('click', event => {
   event.preventDefault();
   setCinematic(false, { focus: false });
+  setToolsPanel('browse');
   $('sector-list').focus({ preventScroll: true });
   $('sector-list').scrollIntoView({ block: 'nearest' });
 });
@@ -47,57 +70,144 @@ $('quality-select').addEventListener('change', event => {
   scene?.setQuality(quality);
   try { localStorage.setItem('eh-render-quality', quality); } catch { /* Optional preference only. */ }
 });
-const adjacency = new Map();
+let explorer;
 const markers = new Map();
+const clusterName = id => graph?.clusters.find(cluster => cluster.id === id)?.label || 'all streams';
 
-function inspectNode(id) {
-  selectedNode = graph.nodes.find(node => node.id === id) || null;
-  scene?.selectNode(selectedNode?.id);
-  $('node-facts').hidden = !selectedNode;
-  if (selectedNode) {
-    $('node-select').value = selectedNode.id;
-    $('node-id').textContent = selectedNode.id;
-    $('node-degree').textContent = format(adjacency.get(selectedNode.id)?.size || 0);
-    $('reticle-label').textContent = selectedNode.id;
-    $('announcement').textContent = `${selectedNode.id}. ${adjacency.get(selectedNode.id)?.size || 0} total connections.`;
-  } else {
-    $('node-reticle').hidden = true;
+function renderNeighbors() {
+  const result = explorer.neighbors();
+  $('node-degree').textContent = format(result.total);
+  $('connection-summary').textContent = `${format(result.within)} within stream · ${format(result.cross)} cross-sector`;
+  $('neighbor-total').textContent = format(result.total);
+  $('neighbor-filter').value = explorer.current.filter;
+  $('neighbor-range').textContent = `${format(result.start)}–${format(result.end)} of ${format(result.filtered)}`;
+  $('neighbor-page').value = result.page + 1;
+  $('neighbor-page').max = result.pages;
+  $('neighbor-page-total').textContent = `/ ${format(result.pages)}`;
+  $('neighbor-prev').disabled = result.page === 0;
+  $('neighbor-next').disabled = result.page === result.pages - 1;
+  $('neighbor-paging').hidden = result.filtered === 0;
+  $('neighbor-empty').hidden = result.filtered !== 0;
+  $('neighbor-empty').textContent = result.total ? 'No connections in this scope. Try all connections.' : 'No connections. This note is an isolated star.';
+  const list = $('neighbor-list');
+  list.start = result.start;
+  list.replaceChildren();
+  for (const node of result.items) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.dataset.neighbor = node.id;
+    button.className = 'neighbor-button';
+    button.setAttribute('aria-label', `Follow ${node.id}, ${clusterName(node.cluster)}${node.cluster !== selectedCluster ? ', cross-sector' : ''}`);
+    const id = document.createElement('span');
+    id.textContent = node.id;
+    const sector = document.createElement('small');
+    sector.textContent = `${clusterName(node.cluster)}${node.cluster !== selectedCluster ? ' ↗' : ''}`;
+    button.append(id, sector);
+    button.addEventListener('click', () => {
+      const sourceId = selectedNode.id;
+      if (!explorer.follow(node.id)) return;
+      applyContext({ sourceId, locate: true });
+      $('history-back').focus({ preventScroll: true });
+    });
+    item.append(button);
+    list.append(item);
   }
 }
 
-function selectCluster(id) {
-  setNavigationMode('orbit');
-  selectedCluster = id;
-  inspectNode(null);
-  scene?.selectCluster(id);
-  $('app').dataset.selected = id === null ? 'false' : 'true';
-  for (const button of document.querySelectorAll('.sector-button')) {
-    button.setAttribute('aria-pressed', String(Number(button.dataset.cluster) === id));
+function applyContext({ sourceId = null, reset = false, locate = false } = {}) {
+  const next = explorer.current;
+  const clusterChanged = selectedCluster !== next.clusterId;
+  if (clusterChanged || reset) {
+    setNavigationMode('orbit');
+    scene?.selectCluster(next.clusterId);
   }
-  const cluster = graph.clusters.find(item => item.id === id);
+  selectedCluster = next.clusterId;
+  selectedNode = graph.nodes.find(node => node.id === next.nodeId) || null;
+  scene?.selectNode(selectedNode?.id);
+  const context = scene?.setConnectionContext?.(selectedNode?.id || null, sourceId);
+  const preview = connectionPreview(context);
+  $('connection-preview').textContent = preview;
+  $('connection-preview').hidden = !selectedNode || !preview;
+  $('app').dataset.selected = String(selectedCluster !== null);
+  $('app').dataset.inspectNode = String(Boolean(selectedNode));
+  $('selection-description').hidden = Boolean(selectedNode);
+  $('resume-inspection').hidden = !selectedNode;
+  $('resume-inspection').textContent = selectedNode ? `Return to ${selectedNode.id} ↗` : '';
+  $('locate-button').disabled = !selectedNode || !scene?.locateNode;
+  setToolsPanel(selectedCluster !== null ? 'inspect' : 'browse');
+  for (const button of document.querySelectorAll('.sector-button')) {
+    button.setAttribute('aria-pressed', String(Number(button.dataset.cluster) === selectedCluster));
+  }
+  const cluster = graph.clusters.find(item => item.id === selectedCluster);
+  const nodes = graph.nodes.filter(node => selectedCluster === null || node.cluster === selectedCluster);
   $('sector-status').textContent = scene ? (cluster ? 'ONE STREAM ISOLATED' : 'ALL NOTES FORM THE DISK') : 'ACCESSIBLE TOPOLOGY INDEX';
-  const visibleNodes = scene ? graph.nodes.filter(node => id === null || node.cluster === id).length : 0;
-  $('render-count').textContent = `${format(visibleNodes)} / ${format(graph.nodes.length)}`;
+  $('render-count').textContent = `${format(scene ? nodes.length : 0)} / ${format(graph.nodes.length)}`;
   $('node-details').hidden = !cluster;
+  $('node-facts').hidden = !selectedNode;
+  $('neighbor-explorer').hidden = !selectedNode;
   $('interaction-guide').hidden = Boolean(cluster);
-
   $('view-name').textContent = cluster ? cluster.label.toUpperCase() : 'ALL SYSTEMS';
   $('selection-title').textContent = cluster?.label || 'The whole, connected.';
   $('selection-description').textContent = cluster
     ? `${format(cluster.count)} notes in this disk stream. Select a star, or choose an anonymous ID below.`
     : 'Every star in the disk is a note. Warped arcs repeat their light. Isolate a colored stream to explore its connections.';
   if (cluster) {
-    const nodes = graph.nodes.filter(node => node.cluster === id);
-    const select = $('node-select');
-    select.replaceChildren(new Option('Choose an anonymous ID', ''));
-    for (const node of nodes) select.append(new Option(node.id, node.id));
+    if (clusterChanged || $('node-select').options.length < 2) {
+      $('node-select').replaceChildren(new Option('Choose an anonymous ID', ''));
+      for (const node of nodes) $('node-select').append(new Option(`${node.id} · ${cluster.label}`, node.id));
+    }
+    $('node-select').value = selectedNode?.id || '';
     $('sector-render-count').textContent = `${format(nodes.length)} / ${format(cluster.count)} sector notes ${scene ? 'in the disk' : 'listed'}.`;
-    $('announcement').textContent = `${cluster.label} isolated. ${format(cluster.count)} notes.`;
-    $('inspector').scrollIntoView({ block: 'nearest' });
+    $('explore-tools').scrollTop = 0;
+  }
+  const previous = explorer.previous;
+  $('history-back').disabled = !previous;
+  $('history-context').textContent = previous ? `Return to ${previous.nodeId || clusterName(previous.clusterId)}.` : 'No previous selection.';
+  if (selectedNode) {
+    $('node-id').textContent = selectedNode.id;
+    $('reticle-label').textContent = selectedNode.id;
+    renderNeighbors();
+    $('announcement').textContent = `${selectedNode.id}, ${cluster.label}. ${format(explorer.neighbors().total)} total connections.`;
+    if (locate) locateSelected({ compact: true });
   } else {
-    $('announcement').textContent = 'View reset. All sectors visible.';
+    $('node-reticle').hidden = true;
+    $('announcement').textContent = cluster ? `${cluster.label} isolated. ${format(cluster.count)} notes.` : 'View reset. All sectors visible.';
   }
 }
+
+function inspectNode(id) {
+  if (explorer?.visit({ clusterId: selectedCluster, nodeId: id || null })) applyContext({ locate: Boolean(id) });
+}
+
+function selectCluster(id) {
+  if (!explorer?.visit({ clusterId: id })) return;
+  applyContext({ reset: id === null });
+  $(id === null ? 'sector-list' : 'node-select').focus({ preventScroll: true });
+}
+
+function locateSelected({ announce = false, compact = false } = {}) {
+  if (!selectedNode) return false;
+  if (compact && narrowQuery.matches) $('neighbor-explorer').open = false;
+  const blockers = ['.intro', '#explore-tools', '#flight-pad', '#fallback'].map(selector => document.querySelector(selector))
+    .filter(element => element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden')
+    .map(element => element.getBoundingClientRect());
+  const located = locateSelection(scene, selectedNode.id, $('observatory').getBoundingClientRect(), blockers);
+  if (announce) $('announcement').textContent = located ? `Locating ${selectedNode.id} in the open scene.` : 'Locate is unavailable. Anonymous connection browsing is still available.';
+  return located;
+}
+$('locate-button').addEventListener('click', () => locateSelected({ announce: true, compact: true }));
+$('neighbor-explorer').addEventListener('toggle', () => {
+  $('neighbor-explorer').querySelector('summary').setAttribute('aria-label', $('neighbor-explorer').open ? 'Hide connections' : 'Show connections');
+  if (narrowQuery.matches && !cinematic && $('neighbor-explorer').open) locateSelected();
+});
+$('history-back').addEventListener('click', () => { const sourceId = selectedNode?.id; if (explorer?.back()) applyContext({ sourceId, locate: true }); });
+$('neighbor-filter').addEventListener('change', event => { explorer.setFilter(event.target.value); renderNeighbors(); });
+$('neighbor-prev').addEventListener('click', () => { explorer.setPage(explorer.current.page - 1); renderNeighbors(); });
+$('neighbor-next').addEventListener('click', () => { explorer.setPage(explorer.current.page + 1); renderNeighbors(); });
+$('neighbor-page').addEventListener('change', event => { explorer.setPage(Number(event.target.value) - 1); renderNeighbors(); });
+$('neighbor-page').addEventListener('keydown', event => {
+  if (event.key === 'Enter') { explorer.setPage(Number(event.target.value) - 1); renderNeighbors(); }
+});
 
 function renderSectors() {
   const list = $('sector-list');
@@ -157,15 +267,14 @@ function showWebGLFallback() {
   $('view-state').textContent = 'TOPOLOGY MODE';
   $('render-count').textContent = `0 / ${format(graph.nodes.length)}`;
   $('sector-status').textContent = 'ACCESSIBLE TOPOLOGY INDEX';
-  if (selectedCluster !== null) selectCluster(selectedCluster);
+  if (selectedCluster !== null) applyContext();
 }
 
 async function init() {
   const response = await fetch(`${import.meta.env.BASE_URL}graph.json`, { credentials: 'omit' });
   if (!response.ok) throw new Error('Topology unavailable.');
   graph = parseGraph(await response.json());
-  for (const node of graph.nodes) adjacency.set(node.id, new Set());
-  for (const [a, b] of graph.edges) { adjacency.get(a).add(b); adjacency.get(b).add(a); }
+  explorer = createExploration(graph);
   $('notes-total').textContent = format(graph.totals.nodes);
   $('links-total').textContent = format(graph.totals.edges);
   $('sectors-total').textContent = format(graph.totals.clusters).padStart(2, '0');
@@ -179,7 +288,6 @@ async function init() {
       onUnavailable: showWebGLFallback,
       onPick(node) {
         setCinematic(false, { focus: false });
-        if (selectedCluster !== node.cluster) selectCluster(node.cluster);
         inspectNode(node.id);
       },
       onProject(positions, nodePosition) {
@@ -217,6 +325,7 @@ function setPaused(value) {
 }
 
 function setNavigationMode(mode) {
+  flightPad?.clear();
   navigationMode = mode;
   scene?.setNavigationMode(mode);
   $('app').dataset.navigation = mode;
@@ -228,19 +337,17 @@ function setNavigationMode(mode) {
 }
 
 $('orbit-button').addEventListener('click', () => setNavigationMode('orbit'));
-for (const button of document.querySelectorAll('[data-flight]')) {
-  const stop = () => scene?.flyControls.thrust.delete(button.dataset.flight);
-  button.addEventListener('pointerdown', event => {
-    event.preventDefault();
-    button.setPointerCapture(event.pointerId);
-    scene?.flyControls.thrust.add(button.dataset.flight);
-  });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur']) button.addEventListener(type, stop);
-  button.addEventListener('keydown', event => {
-    if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); scene?.flyControls.thrust.add(button.dataset.flight); }
-  });
-  button.addEventListener('keyup', stop);
-}
+flightPad = bindFlightPad($('flight-pad'), {
+  getControls: () => scene?.flyControls,
+  isEnabled: () => navigationMode === 'fly' && Boolean(scene) && !$('about-dialog').open,
+  // Re-entering the current mode cancels any scene transition via the existing API.
+  onInput: () => scene?.setNavigationMode('fly'),
+});
+$('flight-exit').addEventListener('click', () => {
+  setNavigationMode('orbit');
+  $('title-toggle').focus({ preventScroll: true });
+});
+$('flight-home').addEventListener('click', () => { resetView(); setCinematic(true); });
 $('fly-button').addEventListener('click', () => {
   setNavigationMode('fly');
   $('observatory').querySelector('canvas')?.focus({ preventScroll: true });
@@ -249,13 +356,14 @@ $('pause-button').addEventListener('click', () => setPaused(!paused));
 motionQuery.addEventListener('change', event => setPaused(event.matches));
 setPaused(paused);
 $('node-select').addEventListener('change', event => inspectNode(event.target.value));
-$('reset-button').addEventListener('click', () => { if (graph) selectCluster(null); });
+function resetView() { if (explorer) { explorer.reset(); applyContext({ reset: true }); } }
+$('reset-button').addEventListener('click', resetView);
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape' || $('about-dialog').open) return;
   if (!cinematic) setCinematic(true);
 });
 
-$('about-button').addEventListener('click', () => $('about-dialog').showModal());
+$('about-button').addEventListener('click', () => { flightPad.clear(); $('about-dialog').showModal(); });
 for (const id of ['close-about', 'close-about-done']) $(id).addEventListener('click', () => $('about-dialog').close());
 
 $('retry-button').addEventListener('click', () => {

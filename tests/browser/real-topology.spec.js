@@ -5,12 +5,13 @@ import { readFileSync } from 'node:fs';
 const raw = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8'));
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
 
-test('real public topology has truthful counts and discoverable tiny sectors', async ({ page }) => {
+test('real public topology has truthful counts and discoverable tiny sectors', async ({ page, baseURL }) => {
   const errors = [];
   const external = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/') && !request.url().startsWith('data:')) external.push(request.url()); });
+  const allowedOrigin = new URL(baseURL).origin;
+  page.on('request', request => { if (new URL(request.url()).origin !== allowedOrigin && !request.url().startsWith('data:')) external.push(request.url()); });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
   await openTools(page);
