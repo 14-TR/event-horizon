@@ -77,7 +77,7 @@ async function load(page, { fixture = false } = {}) {
 
 function sectorButton(page, clusterId) {
   const label = `Sector ${String(sectorIds.indexOf(clusterId) + 1).padStart(2, '0')}`;
-  return page.getByRole('button', { name: `${label}, ${fmt(raw.nodes.filter(node => node.cluster === clusterId).length)} notes`, exact: true });
+  return page.getByRole('button', { name: `${label}, ${fmt(raw.nodes.filter(node => node.cluster === clusterId).length)} notes`, exact: true, includeHidden: true });
 }
 
 async function inspectHub(page) {
@@ -148,7 +148,7 @@ async function followCross(page) {
   const list = page.getByRole('list', { name: 'Connected notes', exact: true });
   const target = list.getByRole('button', { name: new RegExp(`^Follow ${cross.id}\\b`) });
   if (!await list.isVisible()) {
-    const disclosure = page.getByRole('button', { name: 'Show connections', exact: true });
+    const disclosure = page.getByLabel('Show connections', { exact: true });
     if (await disclosure.count()) await disclosure.click();
   }
   await expect(list).toBeVisible();
@@ -223,7 +223,9 @@ for (const viewport of phones) {
     await expect(page.locator('#node-facts')).toBeHidden();
     await expect(page.locator('#app')).toHaveAttribute('data-navigation', 'orbit');
     await expect(page.locator('#render-count')).toHaveText(`${fmt(raw.nodes.length)} / ${fmt(raw.nodes.length)}`);
-    await expect.poll(() => camera(page)).toEqual(home);
+    // OrbitControls reconstructs spherical coordinates; roundoff near zero
+    // (~1e-14) is not movement. Keep every matrix element tightly bounded.
+    await expect.poll(async () => Math.max(...(await camera(page)).map((value, i) => Math.abs(value - home[i])))).toBeLessThan(1e-10);
   });
 }
 

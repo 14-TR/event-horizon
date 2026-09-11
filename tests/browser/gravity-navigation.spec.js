@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { browseStreams } from './tools.js';
 
 /**
  * Sprint Gravity UI contract (no scene mocks or test-only production hooks):
@@ -17,8 +18,8 @@ const fmt = n => new Intl.NumberFormat('en-US').format(n);
 const MAX_MOUNTED_NEIGHBORS = 24;
 const list = page => page.getByRole('list', { name: 'Connected notes', exact: true });
 const followButtons = page => list(page).getByRole('button', { name: /^Follow n\d{6,12}\b/, includeHidden: true });
-const next = page => page.getByRole('button', { name: 'Next connections', exact: true });
-const previous = page => page.getByRole('button', { name: 'Previous connections', exact: true });
+const next = page => page.getByRole('button', { name: 'Next connections', exact: true, includeHidden: true });
+const previous = page => page.getByRole('button', { name: 'Previous connections', exact: true, includeHidden: true });
 const back = page => page.getByRole('button', { name: 'Back to previous node', exact: true });
 const locate = page => page.getByRole('button', { name: 'Locate selected node', exact: true });
 
@@ -63,12 +64,15 @@ async function loadFallback(page, raw, { published = false } = {}) {
 
 function sectorButton(page, graph, id) {
   const sector = graph.sectors.find(sector => sector.id === id);
-  return page.getByRole('button', { name: `${sector.label}, ${fmt(sector.count)} notes`, exact: true });
+  return page.getByRole('button', { name: `${sector.label}, ${fmt(sector.count)} notes`, exact: true, includeHidden: true });
 }
 
 async function inspect(page, graph, node) {
   const sector = sectorButton(page, graph, node.cluster);
-  if (await sector.getAttribute('aria-pressed') !== 'true') await sector.click();
+  if (await sector.getAttribute('aria-pressed') !== 'true') {
+    await browseStreams(page);
+    await sector.click();
+  }
   await page.getByRole('combobox', { name: 'Inspect an anonymous node', exact: true }).selectOption(node.id);
   await expect(page.locator('#node-id')).toHaveText(node.id);
   await expect(page.locator('#node-degree')).toHaveText(fmt(graph.adjacency.get(node.id).size));
@@ -83,7 +87,7 @@ async function enter(locator) {
 
 async function pageIds(page) {
   if (!await list(page).isVisible()) {
-    const disclosure = page.getByRole('button', { name: 'Show connections', exact: true });
+    const disclosure = page.getByLabel('Show connections', { exact: true });
     if (await disclosure.count()) await enter(disclosure);
   }
   await expect(list(page), 'A degree counter alone does not provide access to connected notes').toBeVisible();
@@ -194,7 +198,7 @@ for (const { label, raw, published } of cases) {
     await inspect(page, graph, graph.hub);
     expect((await pageIds(page)).length).toBeGreaterThan(0);
     await inspect(page, graph, isolate);
-    const disclosure = page.getByRole('button', { name: 'Show connections', exact: true });
+    const disclosure = page.getByLabel('Show connections', { exact: true });
     if (await disclosure.count()) await enter(disclosure);
     await expect(page.locator('#node-degree')).toHaveText('0');
     await expect(followButtons(page)).toHaveCount(0);

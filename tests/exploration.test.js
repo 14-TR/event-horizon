@@ -55,6 +55,17 @@ test('cross-sector and within-sector filters partition real adjacency with truth
   assert.equal(explorer.neighbors().page, 0);
 });
 
+test('first note inspection has no previous node, including after Home and sector browsing', () => {
+  const explorer = createExploration(graph);
+  for (let visit = 0; visit < 2; visit++) {
+    explorer.visit({ clusterId: hub.cluster });
+    explorer.visit({ nodeId: hub.id });
+    assert.equal(explorer.previous, null, 'sector-only and home contexts are not previous notes');
+    assert.equal(explorer.back(), false);
+    explorer.reset();
+  }
+});
+
 test('following a genuine cross-sector connection and Back restore the source, filter and page', () => {
   const explorer = createExploration(graph);
   explorer.visit({ clusterId: hub.cluster, nodeId: hub.id });

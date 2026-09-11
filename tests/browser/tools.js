@@ -8,3 +8,13 @@ export async function openTools(page) {
   if (await title.getAttribute('aria-expanded') === 'false') await title.click();
   await expect(page.locator('#explore-tools')).toBeVisible();
 }
+
+// Compact inspection deliberately conceals global streams; navigate through
+// the actual disclosure rather than clicking hidden controls or sampling IDs.
+export async function browseStreams(page) {
+  await openTools(page);
+  if (!await page.locator('#sector-list').isVisible()) {
+    await page.getByRole('button', { name: 'Browse streams', exact: true }).click();
+  }
+  await expect(page.locator('#sector-list')).toBeVisible();
+}

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openTools } from './tools.js';
+import { openTools, browseStreams } from './tools.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const graph = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url)));
@@ -83,6 +83,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const enumerated = [];
     for (const cluster of graph.clusters) {
       const nodes = graph.nodes.filter(n => n.cluster === cluster.id);
+      await browseStreams(page);
       await page.locator(`.sector-button[data-cluster="${cluster.id}"]`).click();
       const listed = await page.locator('#node-select option').evaluateAll(options => options.map(o => o.value).filter(Boolean));
       expect(listed.sort()).toEqual(nodes.map(n => n.id).sort());

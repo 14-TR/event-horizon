@@ -25,7 +25,7 @@ export function createExploration(graph) {
     if (node) clusterId = node.cluster;
     if (clusterId !== null && !graph.clusters.some(cluster => cluster.id === clusterId)) return false;
     if (current.clusterId === clusterId && current.nodeId === nodeId) return true;
-    history.push({ ...current });
+    if (current.nodeId !== null) history.push({ ...current });
     current = { clusterId, nodeId, page: 0, filter: 'all' };
     return true;
   }
