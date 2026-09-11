@@ -123,6 +123,65 @@ export function noteLightMaterial(capture = false, extent = 1) {
   });
 }
 
+/** A bounded screen-light image, borrowing every actual volume unchanged. */
+export class NoteLightPass {
+  constructor(sources) {
+    this.target = new THREE.WebGLRenderTarget(1, 1, {
+      type: THREE.HalfFloatType, format: THREE.RGBAFormat,
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      depthBuffer: false, stencilBuffer: false, generateMipmaps: false,
+    });
+    this.target.texture.name = 'actual-note-direct-volume-light';
+    this.scene = new THREE.Scene();
+    this.entries = sources.map(source => {
+      const image = new THREE.Mesh(source.geometry, source.material);
+      image.frustumCulled = false;
+      image.matrixAutoUpdate = false;
+      image.raycast = () => {};
+      this.scene.add(image);
+      return { source, image };
+    });
+  }
+
+  resize(width, height) {
+    this.target.setSize(width, height);
+    for (const { image } of this.entries) image.material.uniforms.uViewport.value.set(width, height);
+  }
+
+  render(renderer, camera) {
+    // Borrow live geometry/materials, but never source IDs or picking. Updating
+    // before renderer.render also reaches the next paused frame's GPU upload.
+    for (const { source, image } of this.entries) {
+      source.onBeforeRender();
+      source.updateWorldMatrix(true, false);
+      image.matrix.copy(source.matrixWorld);
+      image.visible = true;
+      for (let parent = source; parent; parent = parent.parent) image.visible &&= parent.visible;
+    }
+    const target = renderer.getRenderTarget(), autoClear = renderer.autoClear;
+    const color = renderer.getClearColor(new THREE.Color()).clone(), alpha = renderer.getClearAlpha();
+    const scissor = renderer.getScissor(new THREE.Vector4()), scissorTest = renderer.getScissorTest();
+    try {
+      renderer.autoClear = false;
+      renderer.setScissorTest(false);
+      renderer.setRenderTarget(this.target);
+      renderer.setClearColor(0, 0);
+      renderer.clear(true, false, false);
+      renderer.render(this.scene, camera);
+    } finally {
+      renderer.setRenderTarget(target);
+      renderer.setClearColor(color, alpha);
+      renderer.setScissor(scissor);
+      renderer.setScissorTest(scissorTest);
+      renderer.autoClear = autoClear;
+    }
+  }
+
+  dispose() {
+    this.target.dispose();
+  }
+}
+
 /** One noninteractive light envelope per actual source; never another node. */
 export function createNoteLight(points) {
   const geometry = new THREE.InstancedBufferGeometry().copy(new THREE.BoxGeometry(2, 2, 2));

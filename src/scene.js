@@ -8,7 +8,7 @@ import { BlackHoleRenderer } from './black-hole.js';
 import { StarTrails } from './star-trails.js';
 import { DiskRadiance } from './disk-radiance.js';
 import { stellarColor } from './stellar-emission.js';
-import { createNoteLight } from './note-light.js';
+import { createNoteLight, NoteLightPass } from './note-light.js';
 
 /** Low, slightly rolled framing; narrow screens keep the disk, not UI margins. */
 export function openingFrame(width, height) {
@@ -69,6 +69,7 @@ export class Observatory {
     this.clusterObjects = new Map();
     this.addBlackHole();
     this.addConstellations();
+    this.noteLight = new NoteLightPass([...this.clusterObjects.values()].map(({ glow }) => glow));
     this.addTrails();
     this.updateInfall(0);
     this.pointerAbort = new AbortController();
@@ -143,6 +144,9 @@ export class Observatory {
       points.userData.nodes = nodes;
       group.add(points);
       const glow = createNoteLight(points);
+      // Layer 1 holds source volumes for borrowed capture/direct-light passes;
+      // the main camera's layer 0 still draws every crisp note and trail once.
+      glow.layers.set(1);
       if (this.blackHole) {
         glow.material.uniforms.uRayDepth.value = this.blackHole.target.texture;
         glow.material.uniforms.uOcclusion.value = 1;
@@ -245,6 +249,7 @@ export class Observatory {
     this.blackHole.setQuality(name);
     this.quality = name;
     this.addTrails();
+    this.noteLight.resize(this.blackHole.settings.width, this.blackHole.settings.height);
     this.reportQuality();
   }
 
@@ -318,9 +323,7 @@ export class Observatory {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.blackHole.resize(width, height, this.renderer.getPixelRatio());
-    for (const { glow } of this.clusterObjects.values()) {
-      this.renderer.getDrawingBufferSize(glow.material.uniforms.uViewport.value);
-    }
+    this.noteLight.resize(this.blackHole.settings.width, this.blackHole.settings.height);
     this.reportQuality();
     const atHome = this.navigationMode === 'orbit' && this.selectedCluster == null
       && this.camera.position.distanceToSquared(this.homePosition) < 1e-8
@@ -338,7 +341,7 @@ export class Observatory {
   }
 
   drawFrame() {
-    this.blackHole.render(this.renderer, this.camera, this.time, this.scene);
+    this.blackHole.render(this.renderer, this.camera, this.time, this.scene, this.noteLight);
     if (this.shaderError) throw this.shaderError;
   }
 
@@ -382,6 +385,7 @@ export class Observatory {
     this.controls.dispose();
     this.flyControls.dispose();
     this.diskRadiance.dispose();
+    this.noteLight.dispose();
     this.scene.traverse(object => {
       object.geometry?.dispose();
       if (object.material) object.material.dispose();

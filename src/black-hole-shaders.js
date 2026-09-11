@@ -286,6 +286,8 @@ export const compositeFragment = /* glsl */ `
   in vec2 vUv;
   layout(location = 0) out vec4 outColor;
   uniform sampler2D uImage;
+  uniform sampler2D uForegroundLight;
+  uniform float uForegroundEnabled;
   uniform vec2 uTexel;
   uniform mat4 uInverseProjection;
   uniform mat4 uProjection;
@@ -310,6 +312,13 @@ export const compositeFragment = /* glsl */ `
     // Deliberately modest optical glare, no broad orange veil across the frame.
     vec3 mapped = vec3(1.0) - exp(-linearColor * uExposure);
     outColor = linearToOutputTexel(vec4(mapped, 1));
+    // Preserve the direct volumes' screen-space exposure grade. Combining this
+    // bounded soft layer here avoids another fullscreen/MSAA blend; actual
+    // stellar cores and trails still draw at full canvas resolution afterward.
+    if (uForegroundEnabled > 0.0) {
+      vec3 light = texture(uForegroundLight, vUv).rgb;
+      outColor.rgb = light + outColor.rgb * (1.0 - light);
+    }
 
     float depth = abs(image.a);
     if (depth >= 59000.0) { gl_FragDepth = 1.0; }

@@ -35,6 +35,30 @@ test('the module owns disposable render targets and tracks camera in a fixed hol
   assert.equal(disposed, true);
 });
 
+test('direct volume light is folded into the existing composite before crisp foreground geometry', () => {
+  const hole = new blackHole.BlackHoleRenderer();
+  const camera = new PerspectiveCamera(48, 1, 0.1, 100);
+  const foreground = new Group(), order = [];
+  const light = { target: { texture: {} }, render: () => order.push('volumes') };
+  let target = null;
+  const renderer = {
+    extensions: { has: () => true }, autoClear: true,
+    getRenderTarget: () => target, setRenderTarget: value => { target = value; },
+    getScissorTest: () => false, setScissorTest() {}, getScissor() {}, setScissor() {}, clear() {},
+    render: scene => order.push(scene === hole.rayScene ? 'rays' : scene === hole.compositeScene ? 'composite' : 'foreground'),
+  };
+  hole.render(renderer, camera, 0, foreground, light);
+  assert.deepEqual(order, ['rays', 'volumes', 'composite', 'foreground'], 'no second fullscreen MSAA composite is needed');
+  assert.equal(hole.uniforms.uForegroundLight.value, light.target.texture);
+  assert.equal(hole.uniforms.uForegroundEnabled.value, 1);
+  hole.render(renderer, camera, 0);
+  assert.equal(hole.uniforms.uForegroundEnabled.value, 0, 'omitting a borrowed pass must not retain stale light');
+  assert.equal(hole.uniforms.uForegroundLight.value, null);
+  assert.equal(renderer.autoClear, true);
+  assert.equal(target, null);
+  hole.dispose();
+});
+
 test('invalid hole scale and unsupported cameras fail before NaN ray uniforms', () => {
   assert.throws(() => new blackHole.BlackHoleRenderer({ horizonRadius: 0 }), /positive/);
   const hole = new blackHole.BlackHoleRenderer();

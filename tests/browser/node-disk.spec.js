@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const graph = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url)));
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
+test.use({ deviceScaleFactor: 1.75 });
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test(`all ${graph.nodes.length} actual nodes reach GPU draws and the complete inspector at ${viewport.width}px`, async ({ page }) => {
@@ -15,10 +16,17 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       window.diskDraws = [];
       window.noteEnvelopes = [];
       window.diskEnvelopes = [];
+      window.volumeTargets = [];
       const instanced = WebGL2RenderingContext.prototype.drawElementsInstanced;
       WebGL2RenderingContext.prototype.drawElementsInstanced = function (mode, count, type, offset, instances) {
         if (mode === this.TRIANGLES) {
-          const draws = this.getParameter(this.FRAMEBUFFER_BINDING) ? window.diskEnvelopes : window.noteEnvelopes;
+          const direct = this.getUniformLocation(this.getParameter(this.CURRENT_PROGRAM), 'uRayDepth') !== null;
+          const draws = direct ? window.noteEnvelopes : window.diskEnvelopes;
+          if (direct) {
+            const viewport = this.getParameter(this.VIEWPORT);
+            window.volumeTargets.push({ offscreen: !!this.getParameter(this.FRAMEBUFFER_BINDING), pixels: viewport[2] * viewport[3], samples: this.getParameter(this.SAMPLES) });
+            if (window.volumeTargets.length > 64) window.volumeTargets.shift();
+          }
           draws.push(instances);
           if (draws.length > 64) draws.shift();
         }
@@ -63,7 +71,14 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       }), graph.clusters.length);
       expect(envelopes.direct).toEqual(expectedCounts);
       expect(envelopes.captured).toEqual(expectedCounts);
-      receipt.qualities.push({ quality, gpuPointCount: counts.reduce((sum, n) => sum + n, 0), draws: counts, diskSourceDraws: sourceCounts, envelopes });
+      const volumeTargets = await page.evaluate(count => window.volumeTargets.slice(-count), graph.clusters.length);
+      expect(volumeTargets).toHaveLength(graph.clusters.length);
+      for (const target of volumeTargets) {
+        expect(target.offscreen, 'soft volumes must not shade the unbounded MSAA canvas').toBe(true);
+        expect(target.samples).toBe(0);
+        expect(target.pixels).toBe(Number(await host.getAttribute('data-ray-pixels')));
+      }
+      receipt.qualities.push({ quality, gpuPointCount: counts.reduce((sum, n) => sum + n, 0), draws: counts, diskSourceDraws: sourceCounts, envelopes, volumeTargets });
     }
     const enumerated = [];
     for (const cluster of graph.clusters) {
