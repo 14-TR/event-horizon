@@ -9,6 +9,8 @@ import { StarTrails } from './star-trails.js';
 import { DiskRadiance } from './disk-radiance.js';
 import { stellarColor } from './stellar-emission.js';
 import { createNoteLight, NoteLightPass } from './note-light.js';
+import { locateRegion, nodeFrame, travelPosition } from './node-locate.js';
+import { SelectedConnections } from './selected-connections.js';
 
 /** Low, slightly rolled framing; narrow screens keep the disk, not UI margins. */
 export function openingFrame(width, height) {
@@ -25,6 +27,7 @@ export class Observatory {
     this.layout = buildLayout(graph);
     this.infall = createInfall(this.layout);
     this.paused = paused;
+    this.motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.quality = quality;
     this.onProject = onProject;
     this.onUnavailable = onUnavailable;
@@ -55,7 +58,7 @@ export class Observatory {
     this.controls.maxDistance = 100;
     this.controls.rotateSpeed = 0.45;
     this.controls.zoomSpeed = 0.7;
-    this.controls.addEventListener('start', () => { this.flight = null; });
+    this.controls.addEventListener('start', () => this.cancelNavigation());
     this.homePosition = new THREE.Vector3(...opening.position);
     this.homeTarget = new THREE.Vector3(...opening.target);
     this.camera.position.copy(this.homePosition);
@@ -73,6 +76,7 @@ export class Observatory {
     this.addTrails();
     this.updateInfall(0);
     this.pointerAbort = new AbortController();
+    this.bindNavigationCancellation();
     const canvas = this.renderer.domElement;
     const signal = this.pointerAbort.signal;
     canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); this.unavailable(); }, { signal });
@@ -116,15 +120,16 @@ export class Observatory {
     const positions = new Map(this.layout.nodes.map(node => [node.id, node]));
     // The budget applies to real edges only: no invented constellation links.
     this.visibleEdgeCount = 0;
+    let bufferedEdges = 0;
     const sectorNodes = new Map(this.layout.clusters.map(cluster => [cluster.id, []]));
     const sectorEdges = new Map(this.layout.clusters.map(cluster => [cluster.id, []]));
     for (const node of this.layout.nodes) sectorNodes.get(node.cluster).push(node);
     for (const [a, b] of this.graph.edges) {
-      if (this.visibleEdgeCount >= 8000) break;
+      if (bufferedEdges >= 8000) break;
       const na = positions.get(a), nb = positions.get(b);
       if (na && nb && na.cluster === nb.cluster) {
         sectorEdges.get(na.cluster).push(na, nb);
-        this.visibleEdgeCount++;
+        bufferedEdges++;
       }
     }
     for (const cluster of this.layout.clusters) {
@@ -159,7 +164,7 @@ export class Observatory {
       points.geometry.attributes.aColor.setUsage(THREE.DynamicDrawUsage);
       geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
       const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.035, depthWrite: false }));
-      line.visible = false; // Reveal real connections on isolation, not a web over the disk.
+      line.visible = false; // Context is selected incident edges only, never a sector web.
       group.add(line);
       this.orbital.add(group);
       this.clusterObjects.set(cluster.id, { group, points, glow, line, cluster, color, emission, edgeNodes: lines });
@@ -189,7 +194,7 @@ export class Observatory {
   }
 
   updateInfall(time) {
-    const tracked = this.navigationMode === 'orbit' && this.layout.clusters.find(cluster => cluster.id === this.selectedCluster);
+    const tracked = !this.locating && this.navigationMode === 'orbit' && this.layout.clusters.find(cluster => cluster.id === this.selectedCluster);
     const previous = tracked ? new THREE.Vector3(...tracked.center) : null;
     this.infall(time);
     if (this.trails) { this.trails.update(time); this.reportTrails(); }
@@ -217,6 +222,7 @@ export class Observatory {
       endpoints.needsUpdate = true;
       line.geometry.computeBoundingSphere();
     }
+    this.connections?.update();
   }
 
   pick(clientX, clientY) {
@@ -256,12 +262,15 @@ export class Observatory {
   setPaused(value) {
     this.paused = value;
     this.controls.enableDamping = !value;
-    if (value) this.flight = null;
+    if (value) {
+      this.flight = null;
+      if (this.locating) this.updateNavigation(performance.now());
+    }
   }
 
   setNavigationMode(mode) {
     this.navigationMode = mode;
-    this.flight = null;
+    this.cancelNavigation();
     this.controls.enabled = mode === 'orbit';
     this.flyControls.setEnabled(mode === 'fly');
     if (mode === 'orbit') {
@@ -272,6 +281,9 @@ export class Observatory {
   }
 
   selectCluster(id) {
+    if (id !== null && !this.clusterObjects.has(id)) return;
+    this.cancelNavigation();
+    this.setConnectionContext(null);
     this.selectedCluster = id;
     this.selectedNode = null;
     this.trails.selectedCluster = id;
@@ -280,7 +292,7 @@ export class Observatory {
     this.reportTrails();
     for (const [clusterId, objects] of this.clusterObjects) {
       objects.group.visible = id === null || id === clusterId;
-      objects.line.visible = id !== null;
+      objects.line.visible = false;
     }
     if (id === null) {
       this.setNavigationMode('orbit');
@@ -307,13 +319,112 @@ export class Observatory {
   }
 
   selectNode(id) {
+    if (id !== this.selectedNode?.id) {
+      this.cancelNavigation();
+      this.setConnectionContext(null);
+    }
     this.selectedNode = this.layout.nodes.find(node => node.id === id) || null;
+  }
+
+  /** Return truthful unique-relationship totals and the bounded submitted draw. */
+  setConnectionContext(id, neighborId = null) {
+    if (id != null && !this.connections && !this.failed && !this.disposed) {
+      this.connections = new SelectedConnections(this.graph, this.layout);
+      this.orbital.add(this.connections.line);
+    }
+    const node = this.connections?.nodes.get(id);
+    if (!node || !this.clusterObjects.get(node.cluster)?.group.visible || this.failed || this.disposed) id = null;
+    const context = this.connections?.select(id, neighborId) ?? { id: null, neighborId: null, rendered: 0, total: 0 };
+    context.displayed = context.rendered;
+    this.visibleEdgeCount = context.rendered;
+    this.host.dataset.connectionRendered = String(context.rendered);
+    this.host.dataset.connectionTotal = String(context.total);
+    return context;
+  }
+
+  cancelNavigation() {
+    this.flight = null;
+    this.locating = null;
+  }
+
+  bindNavigationCancellation() {
+    const signal = this.pointerAbort.signal, canvas = this.renderer.domElement;
+    const cancel = () => this.cancelNavigation();
+    for (const type of ['pointerdown', 'wheel', 'keydown']) canvas.addEventListener(type, cancel, { signal, capture: true });
+    window.addEventListener('keydown', event => {
+      const editing = event.target?.closest?.('input, select, textarea, [contenteditable="true"], dialog') || document.querySelector('dialog[open]');
+      if (!editing && !event.metaKey && !event.ctrlKey && !event.altKey
+        && (event.code === 'Escape' || (this.navigationMode === 'fly' && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(event.code)))) cancel();
+    }, { signal });
+    window.addEventListener('blur', cancel, { signal });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); }, { signal });
+  }
+
+  /** Frame a visible actual note without changing the UI's sector/selection. */
+  locateNode(id, { safeRect } = {}) {
+    const node = this.layout.nodes.find(node => node.id === id);
+    if (!node || !this.clusterObjects.get(node.cluster)?.group.visible || this.failed || this.disposed || this.host.clientWidth <= 0 || this.host.clientHeight <= 0) return false;
+    this.orbital.updateWorldMatrix(true, false);
+    const world = new THREE.Vector3(...node.position).applyMatrix4(this.orbital.matrixWorld);
+    const region = locateRegion(safeRect, this.host.clientWidth, this.host.clientHeight);
+    // Drain OrbitControls' private inertia through its public update contract.
+    // Otherwise the next frame applies a stale drag to the located camera.
+    if (this.navigationMode === 'orbit') {
+      const damping = this.controls.enableDamping;
+      this.controls.enableDamping = false;
+      this.controls.update();
+      this.controls.enableDamping = damping;
+    } else {
+      this.controls.target.copy(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(13).add(this.camera.position));
+    }
+    this.flyControls.clear();
+    const immediate = this.paused || this.motionQuery?.matches;
+    this.locating = { node, region, cycle: node.cycle };
+    this.flight = immediate ? null : {
+      kind: 'node', start: performance.now(), fromPosition: this.camera.position.clone(),
+      fromTarget: this.controls.target.clone(), ...nodeFrame(world, this.camera, region),
+    };
+    if (immediate) this.updateNavigation(performance.now());
+    return true;
+  }
+
+  updateNavigation(now) {
+    if (this.navigationMode === 'fly' && (this.flyControls.keys.size || this.flyControls.thrust.size || this.flyControls.look)) this.cancelNavigation();
+    if (this.locating) {
+      const { node, region } = this.locating;
+      const world = new THREE.Vector3(...node.position).applyMatrix4(this.orbital.matrixWorld);
+      const destination = nodeFrame(world, this.camera, region);
+      if (node.cycle !== this.locating.cycle && !this.paused && !this.motionQuery?.matches) {
+        this.flight = { kind: 'node', start: now, fromPosition: this.camera.position.clone(), fromTarget: this.controls.target.clone(), ...destination };
+      }
+      this.locating.cycle = node.cycle;
+      if (this.flight) Object.assign(this.flight, destination);
+      else {
+        this.camera.position.copy(destination.position);
+        this.controls.target.copy(destination.target);
+      }
+    }
+    if (this.flight) {
+      const t = Math.min(1, Math.max(0, (now - this.flight.start) / (this.flight.kind === 'node' ? 780 : 1050)));
+      const ease = t * t * (3 - 2 * t);
+      if (this.flight.kind === 'node') travelPosition(this.flight.fromPosition, this.flight.position, ease, this.camera.position);
+      else this.camera.position.lerpVectors(this.flight.fromPosition, this.flight.position, ease);
+      this.controls.target.lerpVectors(this.flight.fromTarget, this.flight.target, ease);
+      if (t === 1) this.flight = null;
+    }
+    if (this.locating || this.flight) {
+      this.camera.lookAt(this.controls.target);
+      this.camera.updateMatrixWorld();
+    }
+    if (!this.flight && this.navigationMode === 'fly') this.locating = null;
   }
 
   project(position, checkOcclusion = false) {
     const world = new THREE.Vector3(...position).applyMatrix4(this.orbital.matrixWorld);
     const v = world.clone().project(this.camera);
-    const inView = v.z < 1 && v.z > 0 && Math.abs(v.x) < 0.97 && Math.abs(v.y) < 0.86;
+    // The selected reticle uses the UI's measured safe region, not the broad
+    // title/footer exclusion used to keep automatic sector markers quiet.
+    const inView = v.z < 1 && v.z > -1 && Math.abs(v.x) < (checkOcclusion ? 1 : 0.97) && Math.abs(v.y) < (checkOcclusion ? 1 : 0.86);
     return { x: (v.x * 0.5 + 0.5) * this.host.clientWidth, y: (-v.y * 0.5 + 0.5) * this.host.clientHeight, visible: inView && (!checkOcclusion || !this.blackHole.isOccluded(this.renderer, this.camera, world)) };
   }
 
@@ -348,6 +459,10 @@ export class Observatory {
   unavailable() {
     if (this.failed || this.disposed) return;
     this.failed = true;
+    this.cancelNavigation();
+    this.setConnectionContext(null);
+    this.controls.enabled = false;
+    this.flyControls.setEnabled(false);
     cancelAnimationFrame(this.frameId);
     this.onUnavailable();
   }
@@ -360,13 +475,7 @@ export class Observatory {
       this.time += delta;
       this.updateInfall(this.time);
     }
-    if (this.flight) {
-      const t = Math.min(1, (now - this.flight.start) / 1050);
-      const ease = 1 - Math.pow(1 - t, 3);
-      this.camera.position.lerpVectors(this.flight.fromPosition, this.flight.position, ease);
-      this.controls.target.lerpVectors(this.flight.fromTarget, this.flight.target, ease);
-      if (t === 1) this.flight = null;
-    }
+    this.updateNavigation(now);
     if (this.navigationMode === 'fly') this.flyControls.update(delta);
     else this.controls.update();
     try {
@@ -378,6 +487,8 @@ export class Observatory {
 
   dispose() {
     if (this.disposed) return;
+    this.cancelNavigation();
+    this.setConnectionContext(null);
     this.disposed = true;
     cancelAnimationFrame(this.frameId);
     this.observer.disconnect();
