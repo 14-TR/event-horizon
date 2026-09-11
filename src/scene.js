@@ -143,6 +143,10 @@ export class Observatory {
       points.userData.nodes = nodes;
       group.add(points);
       const glow = createNoteLight(points);
+      if (this.blackHole) {
+        glow.material.uniforms.uRayDepth.value = this.blackHole.target.texture;
+        glow.material.uniforms.uOcclusion.value = 1;
+      }
       points.add(glow);
       const lines = sectorEdges.get(cluster.id);
       const geometry = new THREE.BufferGeometry();
@@ -314,6 +318,9 @@ export class Observatory {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.blackHole.resize(width, height, this.renderer.getPixelRatio());
+    for (const { glow } of this.clusterObjects.values()) {
+      this.renderer.getDrawingBufferSize(glow.material.uniforms.uViewport.value);
+    }
     this.reportQuality();
     const atHome = this.navigationMode === 'orbit' && this.selectedCluster == null
       && this.camera.position.distanceToSquared(this.homePosition) < 1e-8
