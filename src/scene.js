@@ -7,6 +7,8 @@ import { pointVertex, pointFragment } from './shaders.js';
 import { BlackHoleRenderer } from './black-hole.js';
 import { StarTrails } from './star-trails.js';
 import { DiskRadiance } from './disk-radiance.js';
+import { stellarColor } from './stellar-emission.js';
+import { createNoteLight } from './note-light.js';
 
 /** Low, slightly rolled framing; narrow screens keep the disk, not UI margins. */
 export function openingFrame(width, height) {
@@ -128,27 +130,31 @@ export class Observatory {
       const group = new THREE.Group();
       const nodes = sectorNodes.get(cluster.id);
       const p = [], c = [], s = [];
-      const color = new THREE.Color(cluster.color);
+      const color = new THREE.Color(cluster.color), emission = new THREE.Color();
       for (const node of nodes) {
         p.push(...node.position);
-        c.push(color.r, color.g, color.b);
+        stellarColor(node.position, color, emission);
+        c.push(emission.r, emission.g, emission.b);
         // Stable stellar hierarchy, unrelated to degree or private meaning.
         const magnitude = (Number(node.id.slice(1)) * 0.61803398875) % 1;
-        s.push(nodes.length <= 4 ? 14 : 6.5 + 7.5 * Math.pow(magnitude, 2));
+        s.push(3.1 + 11 * Math.pow(magnitude, 6));
       }
       const points = this.points(p, c, s);
       points.userData.nodes = nodes;
       group.add(points);
+      const glow = createNoteLight(points);
+      points.add(glow);
       const lines = sectorEdges.get(cluster.id);
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(lines.flatMap(node => node.position), 3));
       points.geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
+      points.geometry.attributes.aColor.setUsage(THREE.DynamicDrawUsage);
       geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
       const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.035, depthWrite: false }));
       line.visible = false; // Reveal real connections on isolation, not a web over the disk.
       group.add(line);
       this.orbital.add(group);
-      this.clusterObjects.set(cluster.id, { group, points, line, cluster, edgeNodes: lines });
+      this.clusterObjects.set(cluster.id, { group, points, glow, line, cluster, color, emission, edgeNodes: lines });
     }
     if (this.host?.dataset) this.host.dataset.noteStars = String([...this.clusterObjects.values()].reduce((sum, { points }) => sum + points.geometry.attributes.position.count, 0));
   }
@@ -161,7 +167,8 @@ export class Observatory {
     this.orbital.add(this.trails.mesh);
     this.trails.update(this.time);
     this.reportTrails();
-    this.diskRadiance = new DiskRadiance([...this.clusterObjects.values()].map(({ points }) => points), this.trails.mesh, this.quality);
+    const objects = [...this.clusterObjects.values()];
+    this.diskRadiance = new DiskRadiance(objects.map(({ points }) => points), this.trails.mesh, this.quality, objects.map(({ glow }) => glow));
     this.blackHole.setDiskRadiance(this.diskRadiance);
     this.host.dataset.diskSourceStars = String(this.diskRadiance.noteCount);
     this.host.dataset.diskImageSize = String(this.diskRadiance.target.width);
@@ -186,10 +193,16 @@ export class Observatory {
         for (const key of ['fromPosition', 'fromTarget', 'position', 'target']) this.flight[key].add(shift);
       }
     }
-    for (const { points, line, edgeNodes } of this.clusterObjects.values()) {
+    for (const { points, line, edgeNodes, color, emission } of this.clusterObjects.values()) {
       const positions = points.geometry.attributes.position;
-      points.userData.nodes.forEach((node, index) => positions.setXYZ(index, ...node.position));
+      const colors = points.geometry.attributes.aColor;
+      points.userData.nodes.forEach((node, index) => {
+        positions.setXYZ(index, ...node.position);
+        stellarColor(node.position, color, emission);
+        colors.setXYZ(index, emission.r, emission.g, emission.b);
+      });
       positions.needsUpdate = true;
+      colors.needsUpdate = true;
       points.geometry.computeBoundingSphere(); // Raycasting and culling must move too.
       const endpoints = line.geometry.attributes.position;
       edgeNodes.forEach((node, index) => endpoints.setXYZ(index, ...node.position));

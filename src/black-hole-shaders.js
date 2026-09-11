@@ -7,6 +7,32 @@ export const fullscreenVertex = /* glsl */ `
   }
 `;
 
+// Eight bounded taps resolve an elongated ray footprint without applying its
+// largest mip to both axes. Only actual source radiance supplies these samples.
+export const diskFilter = /* glsl */ `
+  vec3 sampleDiskRadiance(sampler2D image, vec2 uv, vec2 dx, vec2 dy) {
+    vec2 size = vec2(textureSize(image, 0));
+    vec2 x = dx * size, y = dy * size;
+    vec2 major = dot(x, x) > dot(y, y) ? x : y;
+    float width = max(length(major), 1.0);
+    // Discontinuous / unresolved critical rays cannot define a directional
+    // footprint. Widely spaced taps would paint separated ghost crescents.
+    if (width > 32.0) return textureLod(image, uv, 4.5).rgb;
+    float minor = abs(x.x * y.y - x.y * y.x) / width;
+    float lod = clamp(log2(max(max(minor, width * 0.125), 1.0)), 0.5, 4.5);
+    vec2 stepUv = major / size * 0.125;
+    return 0.125 * (
+      textureLod(image, uv - stepUv * 3.5, lod).rgb +
+      textureLod(image, uv - stepUv * 2.5, lod).rgb +
+      textureLod(image, uv - stepUv * 1.5, lod).rgb +
+      textureLod(image, uv - stepUv * 0.5, lod).rgb +
+      textureLod(image, uv + stepUv * 0.5, lod).rgb +
+      textureLod(image, uv + stepUv * 1.5, lod).rgb +
+      textureLod(image, uv + stepUv * 2.5, lod).rgb +
+      textureLod(image, uv + stepUv * 3.5, lod).rgb);
+  }
+`;
+
 export const rayFragment = /* glsl */ `
   precision highp float;
   in vec2 vUv;
@@ -29,6 +55,8 @@ export const rayFragment = /* glsl */ `
   const float OUTER = 10.8;
   const float THICKNESS = 0.115;
   const float NO_HIT = 60000.0;
+
+  ${diskFilter}
 
   float hash21(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -167,7 +195,19 @@ export const rayFragment = /* glsl */ `
               // Fade weakly bent primary light; ordinary stars are drawn later.
               // Exposure-grade the finite source footprint as luminous light,
               // not a dark reflective-looking surface. This is art direction.
-              noteWeight = 3.8 * highlight * secondary;
+              // Hybrid rendering keeps ordinary 3D sources in the direct pass.
+              // Prioritize repeated light whose straight source-to-camera
+              // segment approaches the capture cone, with a soft boundary. This
+              // avoids a second, displaced primary disk at high inclinations;
+              // it deliberately omits some physically possible secondary light.
+              vec3 toSource = hit - origin;
+              float sourceDistance = length(toSource);
+              vec3 straight = toSource / max(sourceDistance, 0.001);
+              float closest = -dot(origin, straight);
+              float impact = length(origin + straight * closest);
+              float occultationWeight = (1.0 - smoothstep(1.7, 3.8, impact)) *
+                smoothstep(0.0, 0.3, closest) * smoothstep(0.0, 0.3, sourceDistance - closest);
+              noteWeight = 1.1 * highlight * secondary * occultationWeight;
             }
           }
         }
@@ -208,16 +248,13 @@ export const rayFragment = /* glsl */ `
     vec3 worldEscape = normalize((uHoleToWorld * vec4(normalize(v), 0)).xyz);
     vec3 background = sky(worldEscape); // derivatives evaluated for all pixels
     if (escaped) radiance += transmission * background;
-    // A finite ray-cone footprint filters the ACTUAL exposure, not procedural
-    // gas. Derivatives are evaluated before branching so critical-ray borders
-    // cannot choose an undefined mip. This removes needle-thin sampled rails.
+    // Evaluate derivatives before branching; filter the actual exposure along
+    // the ray footprint, preserving its narrow-axis structure rather than
+    // isotropically smearing short source glints into a ribbed luminous slab.
     vec2 sourceSize = vec2(textureSize(uDiskImage, 0));
-    vec2 sourceDx = dFdx(noteUv) * sourceSize;
-    vec2 sourceDy = dFdy(noteUv) * sourceSize;
-    float footprint = max(dot(sourceDx, sourceDx), dot(sourceDy, sourceDy));
-    float sourceLod = clamp(0.5 * log2(max(footprint, 1.0)), 2.6, 4.5);
-    // Two bounded lookups OUTSIDE integration. The first reads actual
-    // emission-weighted height; the second corrects the plane intersection.
+    vec2 sourceDx = dFdx(noteUv), sourceDy = dFdy(noteUv);
+    // Nine bounded lookups OUTSIDE integration: one broadly supported actual
+    // emission-weighted height lookup, then eight directional radiance taps.
     // This retains shallow source depth instead of flattening every note into
     // the same perfectly concentric Einstein ring at an edge-on alignment.
     if (uDiskEnabled > 0.0 && noteWeight > 0.0 && escaped) {
@@ -225,11 +262,11 @@ export const rayFragment = /* glsl */ `
       // initially empty plane lookup can never discover a displaced source.
       // A four-texel-wide height mip covers the entire +/-0.08 UV correction.
       // RGB and signed height are averaged together, keeping their ratio valid.
-      float heightLod = max(sourceLod, log2(max(sourceSize.x, sourceSize.y) * 0.25));
+      float heightLod = log2(max(sourceSize.x, sourceSize.y) * 0.25);
       vec4 source = textureLod(uDiskImage, noteUv, heightLod);
       float height = clamp(source.a / max(dot(source.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.00000001), -0.65, 0.65);
       vec2 liftedUv = noteUv + clamp(noteSlope * height / (2.0 * uDiskExtent), vec2(-0.08), vec2(0.08));
-      radiance += textureLod(uDiskImage, liftedUv, sourceLod).rgb * noteWeight;
+      radiance += sampleDiskRadiance(uDiskImage, liftedUv, sourceDx, sourceDy) * noteWeight;
     }
     // No reflective surface or light painted into the absorbing center.
     if (captured) radiance = vec3(0.0);

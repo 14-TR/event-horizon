@@ -46,6 +46,27 @@ test('populous streams have broad, irregular cross-sections rather than three na
   }
 });
 
+test('actual source density concentrates inward in coherent, irregular streams with a sparse outer edge', () => {
+  const layout = buildLayout(parseGraph(raw));
+  const radius = node => Math.hypot(node.position[0], node.position[2]);
+  const inner = layout.nodes.filter(node => radius(node) < 5.8).length;
+  const outer = layout.nodes.filter(node => radius(node) > 9.5).length;
+  assert.ok(inner > layout.nodes.length * 0.58, 'most actual notes, not added gas, form the inner light reservoir');
+  assert.ok(outer < layout.nodes.length * 0.13, 'the outer edge is genuinely sparse, not uniformly populated at lower bloom');
+  const rim = layout.nodes.filter(node => radius(node) < 3.8).length;
+  assert.ok(rim < inner * 0.2, 'the inner reservoir has radial breadth instead of piling notes onto an infinitesimal bright rim');
+  for (const cluster of layout.clusters.filter(c => c.count > 100)) {
+    for (let bin = 0; bin < 5; bin++) {
+      const nodes = layout.nodes.filter(n => n.cluster === cluster.id && Math.floor(n.orbit.phase * 5) === bin);
+      const coherence = Math.hypot(
+        nodes.reduce((sum, n) => sum + n.position[0] / radius(n), 0),
+        nodes.reduce((sum, n) => sum + n.position[2] / radius(n), 0),
+      ) / nodes.length;
+      assert.ok(coherence > 0.68, `${cluster.id}/${bin}: neighboring radial phases share a stream, not uniform azimuthal dust (${coherence})`);
+    }
+  }
+});
+
 test('a singleton sector has a real star at its marker within the same disk', () => {
   const layout = buildLayout({ nodes: [{ id: 'n000001', cluster: 0 }], clusters: [{ id: 0, count: 1 }], edges: [] });
   assert.deepEqual(layout.nodes[0].position, layout.clusters[0].center);

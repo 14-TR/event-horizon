@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DISK } from './layout.js';
 import { stellarLight } from './shaders.js';
+import { noteLightMaterial } from './note-light.js';
 
 export const DISK_IMAGE_SIZES = Object.freeze({ mobile: 512, desktop: 768, cinematic: 1024 });
 const extent = DISK.outer + 0.7; // Includes sprite footprints and bounded trail ends.
@@ -16,7 +17,7 @@ const flatPosition = /* glsl */ `
  * A single mean height and finite sprite footprints remain approximations.
  */
 export class DiskRadiance {
-  constructor(points, trailSource, quality = 'desktop') {
+  constructor(points, trailSource, quality = 'desktop', envelopes = []) {
     const size = DISK_IMAGE_SIZES[quality];
     if (!size) throw new RangeError(`Unknown disk image quality: ${quality}`);
     this.extent = extent;
@@ -89,6 +90,16 @@ export class DiskRadiance {
       return { source, image };
     });
     this.noteCount = points.reduce((sum, source) => sum + source.geometry.attributes.position.count, 0);
+    this.envelopeMaterial = noteLightMaterial(true, extent);
+    this.envelopes = envelopes.map(source => {
+      const image = new THREE.Mesh(source.geometry, this.envelopeMaterial);
+      image.frustumCulled = false;
+      image.matrixAutoUpdate = false;
+      image.raycast = () => {};
+
+      this.scene.add(image);
+      return { source, image };
+    });
     this.trailSource = trailSource;
     this.trailImage = new THREE.LineSegments(trailSource.geometry, this.trailMaterial);
     this.trailImage.frustumCulled = false;
@@ -98,8 +109,12 @@ export class DiskRadiance {
   }
 
   render(renderer) {
+    // Three uploads attributes while building its render list, BEFORE calling
+    // mesh.onBeforeRender. Synchronize here so a paused source edit reaches the
+    // very next capture, rather than showing stale color/height for one frame.
+    for (const { source } of this.envelopes) source.onBeforeRender();
     // Honor isolation/visibility, including ancestors, without moving live objects.
-    for (const { source, image } of [...this.entries, { source: this.trailSource, image: this.trailImage }]) {
+    for (const { source, image } of [...this.entries, ...this.envelopes, { source: this.trailSource, image: this.trailImage }]) {
       source.updateWorldMatrix(true, false);
       image.matrix.copy(source.matrixWorld);
       image.visible = true;
@@ -128,5 +143,6 @@ export class DiskRadiance {
     this.target.dispose();
     this.pointMaterial.dispose();
     this.trailMaterial.dispose();
+    this.envelopeMaterial.dispose();
   }
 }

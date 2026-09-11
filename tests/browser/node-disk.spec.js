@@ -13,6 +13,17 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.addInitScript(() => {
       window.noteDraws = [];
       window.diskDraws = [];
+      window.noteEnvelopes = [];
+      window.diskEnvelopes = [];
+      const instanced = WebGL2RenderingContext.prototype.drawElementsInstanced;
+      WebGL2RenderingContext.prototype.drawElementsInstanced = function (mode, count, type, offset, instances) {
+        if (mode === this.TRIANGLES) {
+          const draws = this.getParameter(this.FRAMEBUFFER_BINDING) ? window.diskEnvelopes : window.noteEnvelopes;
+          draws.push(instances);
+          if (draws.length > 64) draws.shift();
+        }
+        return instanced.call(this, mode, count, type, offset, instances);
+      };
       const original = WebGL2RenderingContext.prototype.drawArrays;
       WebGL2RenderingContext.prototype.drawArrays = function (mode, first, count) {
         if (mode === this.POINTS) {
@@ -46,7 +57,13 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(counts).toEqual(expectedCounts);
       const sourceCounts = await page.evaluate(count => window.diskDraws.slice(-count).sort((a, b) => a - b), graph.clusters.length);
       expect(sourceCounts).toEqual(expectedCounts);
-      receipt.qualities.push({ quality, gpuPointCount: counts.reduce((sum, n) => sum + n, 0), draws: counts, diskSourceDraws: sourceCounts });
+      const envelopes = await page.evaluate(count => ({
+        direct: window.noteEnvelopes.slice(-count).sort((a, b) => a - b),
+        captured: window.diskEnvelopes.slice(-count).sort((a, b) => a - b),
+      }), graph.clusters.length);
+      expect(envelopes.direct).toEqual(expectedCounts);
+      expect(envelopes.captured).toEqual(expectedCounts);
+      receipt.qualities.push({ quality, gpuPointCount: counts.reduce((sum, n) => sum + n, 0), draws: counts, diskSourceDraws: sourceCounts, envelopes });
     }
     const enumerated = [];
     for (const cluster of graph.clusters) {

@@ -20,7 +20,27 @@ test('disk radiance reuses every actual note buffer and exposure, never invents 
     view.addConstellations();
     const trails = new StarTrails(view.layout, quality); trails.update(0);
     const sources = [...view.clusterObjects.values()].map(({ points }) => points);
-    const light = new disk.DiskRadiance(sources, trails.mesh, quality);
+    const directColors = new Map(sources.flatMap(source => source.userData.nodes.map((node, i) => [node.id, [
+      source.geometry.attributes.aColor.getX(i), source.geometry.attributes.aColor.getY(i), source.geometry.attributes.aColor.getZ(i),
+    ]])));
+    let vertex = 0;
+    for (const entry of trails.entries) {
+      if (entry.history.length) {
+        const colors = trails.mesh.geometry.attributes.color;
+        assert.deepEqual([colors.getX(vertex), colors.getY(vertex), colors.getZ(vertex)], directColors.get(entry.node.id), 'exposure heads carry the same radial/sector emission as the actual source star');
+        vertex += entry.history.length * 2;
+      }
+    }
+    assert.equal(vertex, trails.mesh.geometry.drawRange.count);
+    const envelopes = [...view.clusterObjects.values()].map(({ glow }) => glow);
+    const light = new disk.DiskRadiance(sources, trails.mesh, quality, envelopes);
+    assert.equal(light.envelopes?.length, sources.length, 'the lens must capture the very same finite note envelopes as the direct view');
+    for (const { source, image } of light.envelopes) {
+      assert.ok(envelopes.includes(source));
+      assert.equal(image.geometry, source.geometry);
+      assert.equal(image.userData.nodes, undefined);
+      assert.equal(image.material.depthTest, false);
+    }
     assert.equal(light.target.width, size);
     assert.equal(light.target.height, size);
     assert.equal(light.noteCount, graph.nodes.length);

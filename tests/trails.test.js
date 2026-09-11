@@ -42,11 +42,35 @@ test('stellar exposures stay shorter than half a second instead of joining into 
   trails.dispose();
 });
 
+test('micro-exposures never reveal long orbital rails at any quality or simulation age', () => {
+  for (const quality of ['mobile', 'desktop', 'cinematic']) {
+    const layout = buildLayout(graph), infall = createInfall(layout), trails = new StarTrails(layout, quality);
+    for (const time of [0, 8, 96, 42008, -1]) {
+      infall(time); trails.update(time);
+      const lengths = [];
+      for (const entry of trails.entries) {
+        assert.ok(entry.exposure >= 0.03 && entry.exposure <= 0.12, 'short ID-stable exposure, not a half-second wire');
+        let from = entry.node.position, length = 0;
+        for (const to of entry.history) {
+          length += Math.hypot(...to.map((v, axis) => v - from[axis])); from = to;
+        }
+        lengths.push(length);
+        assert.ok(length <= 0.24, 'world-length bound matters as well as exposure time');
+      }
+      lengths.sort((a, b) => a - b);
+      assert.ok(lengths[Math.floor(lengths.length * 0.95)] < 0.16, 'the typical trail is a compact glint, not orbit scaffolding');
+    }
+    trails.dispose();
+  }
+});
+
 test('per-note recycling truncates exposure without connecting inner and outer radii', () => {
   const layout = buildLayout(graph), infall = createInfall(layout), trails = new StarTrails(layout);
   const note = layout.nodes[40], wrap = note.orbit.phase * DISK.period;
   infall(wrap + 0.02); trails.update(wrap + 0.02);
-  assert.equal(trails.entries.find(entry => entry.node.id === note.id)?.history.length, 0, 'no exposure point belongs to the previous lap');
+  const recycled = trails.entries.find(entry => entry.node.id === note.id);
+  assert.ok(recycled.history.length < trails.segments, 'the short post-wrap exposure is truncated');
+  assert.ok(recycled.history.every(p => Math.hypot(p[0], p[2]) > 11), 'no exposure point belongs to the previous inner lap');
   for (const time of [wrap - 0.02, wrap + 0.02, 96, 42008, 3]) {
     infall(time); trails.update(time);
     for (const entry of trails.entries) {

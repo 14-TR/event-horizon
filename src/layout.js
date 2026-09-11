@@ -1,6 +1,5 @@
 export const SECTOR_COLORS = ['#b2d6cf', '#f6e2c6', '#c3b6dc', '#dba276', '#d4d4ad', '#d7afb7', '#a5bed4', '#b6ccbf'];
 export const DISK = Object.freeze({ inner: 3.65, outer: 11.8, thickness: 0.48, turns: 7.4, rotation: 0.075, period: 96 });
-const TAU = Math.PI * 2;
 
 function random(seed) {
   let value = seed >>> 0;
@@ -15,12 +14,15 @@ function random(seed) {
 /** One artistic disk coordinate for each real note. Never a semantic distance. */
 export function diskPosition(orbit, time = 0, target = [0, 0, 0]) {
   const phase = ((orbit.phase - time / DISK.period) % 1 + 1) % 1;
-  const r = DISK.inner + (DISK.outer - DISK.inner) * Math.pow(phase, 1.25);
-  const angle = orbit.angle + DISK.turns * Math.pow(phase, 0.72) - time * DISK.rotation;
+  // Longer residence at small radii concentrates real notes, not a gas overlay.
+  // Finite radial slope avoids an artificial density spike at the inner rim.
+  const r = DISK.inner + (DISK.outer - DISK.inner) * (0.24 * phase + 0.76 * Math.pow(phase, 4));
+  const bend = 0.22 * Math.sin(phase * 9.1 + orbit.flow) + 0.12 * Math.sin(phase * 17.3 - orbit.flow);
+  const angle = orbit.angle + DISK.turns * Math.pow(phase, 0.72) + bend - time * DISK.rotation;
   target[0] = Math.cos(angle) * r;
   target[2] = Math.sin(angle) * r;
   // A shallow warp plus independent vertical spread: a volume, not a billboard.
-  target[1] = orbit.height * (0.35 + 0.65 * phase) + Math.sin(angle * 2 + orbit.phase * TAU) * 0.10 * phase;
+  target[1] = orbit.height * (0.35 + 0.65 * phase) + Math.sin(angle * 1.7 + phase * 3.4) * 0.15 * (0.3 + 0.7 * phase);
   return target;
 }
 
@@ -35,15 +37,15 @@ export function buildLayout(graph) {
   const orbits = new Map();
   for (const cluster of clusters) {
     const nodes = buckets.get(cluster.id).sort((a, b) => a.id.localeCompare(b.id));
-    const base = 0.5 + rank.get(cluster.id) * Math.PI / 3;
+    const base = 0.5 + rank.get(cluster.id) * 2.39996322973;
     nodes.forEach((node, index) => {
       const rnd = random(Number(node.id.slice(1)) + 713);
-      const arm = Math.floor(rnd() * 3);
       orbits.set(node.id, {
         phase: (index + 0.25 + rnd() * 0.5) / nodes.length,
-        // Broad, seeded flow cross-sections keep real streams without narrow
-        // radial rails turning into perfectly repeated rings in the lens.
-        angle: base + arm * TAU / 3 + (rnd() - 0.5) * 1.65,
+        // One coherent, irregular stream per sector, not three equally spaced
+        // rails or azimuthally scattered beads. Cross-sections remain broad.
+        flow: base,
+        angle: base + (rnd() + rnd() - 1) * 1.1,
         height: (rnd() + rnd() - 1) * DISK.thickness,
       });
     });
