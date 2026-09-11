@@ -58,6 +58,17 @@ export const rayFragment = /* glsl */ `
 
   ${diskFilter}
 
+  // Nine taps per retained crossing, only AFTER integration. The signed mean
+  // height has the same broad support as the bounded shallow-depth correction.
+  vec3 noteImage(vec2 uv, vec2 slope, vec2 dx, vec2 dy) {
+    vec2 size = vec2(textureSize(uDiskImage, 0));
+    float heightLod = log2(max(size.x, size.y) * 0.25);
+    vec4 source = textureLod(uDiskImage, uv, heightLod);
+    float height = clamp(source.a / max(dot(source.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.00000001), -0.65, 0.65);
+    vec2 liftedUv = uv + clamp(slope * height / (2.0 * uDiskExtent), vec2(-0.08), vec2(0.08));
+    return sampleDiskRadiance(uDiskImage, liftedUv, dx, dy);
+  }
+
   float hash21(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
@@ -153,9 +164,9 @@ export const rayFragment = /* glsl */ `
     float b = dot(p, v);
     float discriminant = b * b - dot(p, p) + DOMAIN * DOMAIN;
     vec3 radiance = vec3(0);
-    vec2 noteUv = vec2(-1.0);
-    vec2 noteSlope = vec2(0.0);
-    float noteWeight = 0.0;
+    vec2 noteUv = vec2(-1.0), priorUv = vec2(-1.0);
+    vec2 noteSlope = vec2(0.0), priorSlope = vec2(0.0);
+    float noteWeight = 0.0, priorWeight = 0.0;
     float transmission = 1.0;
     float firstDepth = NO_HIT;
     bool escaped = false;
@@ -176,44 +187,51 @@ export const rayFragment = /* glsl */ `
         vec3 halfVelocity = v + acceleration(p, h2) * (0.5 * dt);
         vec3 next = p + halfVelocity * dt;
 
-        // Strongly bent note images: intersect the ray with the real
-        // disk exposure AFTER periapsis. Direct foreground stars stay 3D.
+        // Intersect bent rays with the live note exposure on BOTH sides of
+        // periapsis. Radial ray direction is not a source-visibility test: a
+        // valid disk crossing moves through periapsis as the camera orbits.
+        // Gating it there cuts the lensed band before it meets the direct disk.
+        // The bend/source-occultation weights below already reject duplicates.
         // Start from a thin plane; the captured mean height corrects it below.
         if (uDiskEnabled > 0.0 && p.y * next.y < 0.0) {
           float fraction = -p.y / (next.y - p.y);
           vec3 hit = mix(p, next, fraction);
-          // Evaluate the direction at the crossing, not the segment midpoint.
-          // A hard dot(hit, halfVelocity)>0 gate exposes integration steps as
-          // sawtooth cuts through inclined arcs. Feather near periapsis instead.
+          // Every direction-dependent weight uses the actual crossing time.
+          // Midpoint directions jump when a hit changes integration segments.
           vec3 hitVelocity = halfVelocity + acceleration(hit, h2) * ((fraction - 0.5) * dt);
-          float outgoing = smoothstep(-0.08, 0.25, dot(normalize(hit), normalize(hitVelocity)));
-          if (outgoing > 0.0) {
-            vec3 worldHit = (uHoleToWorld * vec4(hit, 1.0)).xyz;
-            vec2 uv = worldHit.xz / (2.0 * uDiskExtent) + 0.5;
-            if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
-              vec3 tangent = normalize(vec3(-hit.z, 0.0, hit.x));
-              float highlight = 1.0 + 0.22 * dot(tangent, -normalize(halfVelocity));
-              float secondary = smoothstep(0.04, 0.18, 1.0 - dot(initial, normalize(halfVelocity)));
-              noteUv = uv;
-              vec3 worldDirection = (uHoleToWorld * vec4(halfVelocity, 0.0)).xyz;
-              float vertical = (worldDirection.y < 0.0 ? -1.0 : 1.0) * max(abs(worldDirection.y), 0.035);
-              noteSlope = clamp(worldDirection.xz / vertical, vec2(-12.0), vec2(12.0));
-              // Fade weakly bent primary light; ordinary stars are drawn later.
-              // Exposure-grade the finite source footprint as luminous light,
-              // not a dark reflective-looking surface. This is art direction.
-              // Hybrid rendering keeps ordinary 3D sources in the direct pass.
-              // Prioritize repeated light whose straight source-to-camera
-              // segment approaches the capture cone, with a soft boundary. This
-              // avoids a second, displaced primary disk at high inclinations;
-              // it deliberately omits some physically possible secondary light.
-              vec3 toSource = hit - origin;
-              float sourceDistance = length(toSource);
-              vec3 straight = toSource / max(sourceDistance, 0.001);
-              float closest = -dot(origin, straight);
-              float impact = length(origin + straight * closest);
-              float occultationWeight = (1.0 - smoothstep(1.7, 3.8, impact)) *
-                smoothstep(0.0, 0.3, closest) * smoothstep(0.0, 0.3, sourceDistance - closest);
-              noteWeight = 1.1 * highlight * secondary * occultationWeight * outgoing;
+          vec3 worldHit = (uHoleToWorld * vec4(hit, 1.0)).xyz;
+          vec2 uv = worldHit.xz / (2.0 * uDiskExtent) + 0.5;
+          if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
+            vec3 tangent = normalize(vec3(-hit.z, 0.0, hit.x));
+            float highlight = 1.0 + 0.22 * dot(tangent, -normalize(hitVelocity));
+            float secondary = smoothstep(0.04, 0.18, 1.0 - dot(initial, normalize(hitVelocity)));
+            vec3 worldDirection = (uHoleToWorld * vec4(hitVelocity, 0.0)).xyz;
+            float vertical = (worldDirection.y < 0.0 ? -1.0 : 1.0) * max(abs(worldDirection.y), 0.035);
+            vec2 slope = clamp(worldDirection.xz / vertical, vec2(-12.0), vec2(12.0));
+            // Fade weakly bent primary light; ordinary stars are drawn later.
+            // Exposure-grade the finite source footprint as luminous light,
+            // not a dark reflective-looking surface. This is art direction.
+            // Hybrid rendering keeps ordinary 3D sources in the direct pass.
+            // Prioritize repeated light whose straight source-to-camera
+            // segment approaches the capture cone, with a soft boundary. This
+            // avoids a second, displaced primary disk at high inclinations;
+            // it deliberately omits some physically possible secondary light.
+            vec3 toSource = hit - origin;
+            float sourceDistance = length(toSource);
+            vec3 straight = toSource / max(sourceDistance, 0.001);
+            float closest = -dot(origin, straight);
+            float impact = length(origin + straight * closest);
+            float occultationWeight = (1.0 - smoothstep(1.7, 3.8, impact)) *
+              smoothstep(0.0, 0.3, closest) * smoothstep(0.0, 0.3, sourceDistance - closest);
+            float weight = 1.1 * highlight * secondary * occultationWeight;
+            // Retain the two strongest geometric candidates, not the last
+            // crossings. An invisible later hit cannot erase earlier light.
+            // Higher image orders are bounded, with no texture work in the loop.
+            if (weight > noteWeight) {
+              priorUv = noteUv; priorSlope = noteSlope; priorWeight = noteWeight;
+              noteUv = uv; noteSlope = slope; noteWeight = weight;
+            } else if (weight > priorWeight) {
+              priorUv = uv; priorSlope = slope; priorWeight = weight;
             }
           }
         }
@@ -257,22 +275,11 @@ export const rayFragment = /* glsl */ `
     // Evaluate derivatives before branching; filter the actual exposure along
     // the ray footprint, preserving its narrow-axis structure rather than
     // isotropically smearing short source glints into a ribbed luminous slab.
-    vec2 sourceSize = vec2(textureSize(uDiskImage, 0));
     vec2 sourceDx = dFdx(noteUv), sourceDy = dFdy(noteUv);
-    // Nine bounded lookups OUTSIDE integration: one broadly supported actual
-    // emission-weighted height lookup, then eight directional radiance taps.
-    // This retains shallow source depth instead of flattening every note into
-    // the same perfectly concentric Einstein ring at an edge-on alignment.
-    if (uDiskEnabled > 0.0 && noteWeight > 0.0 && escaped) {
-      // Height must have support beyond the original light footprint, or an
-      // initially empty plane lookup can never discover a displaced source.
-      // A four-texel-wide height mip covers the entire +/-0.08 UV correction.
-      // RGB and signed height are averaged together, keeping their ratio valid.
-      float heightLod = log2(max(sourceSize.x, sourceSize.y) * 0.25);
-      vec4 source = textureLod(uDiskImage, noteUv, heightLod);
-      float height = clamp(source.a / max(dot(source.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.00000001), -0.65, 0.65);
-      vec2 liftedUv = noteUv + clamp(noteSlope * height / (2.0 * uDiskExtent), vec2(-0.08), vec2(0.08));
-      radiance += sampleDiskRadiance(uDiskImage, liftedUv, sourceDx, sourceDy) * noteWeight;
+    vec2 priorDx = dFdx(priorUv), priorDy = dFdy(priorUv);
+    if (uDiskEnabled > 0.0 && escaped) {
+      if (noteWeight > 0.0) radiance += noteImage(noteUv, noteSlope, sourceDx, sourceDy) * noteWeight;
+      if (priorWeight > 0.0) radiance += noteImage(priorUv, priorSlope, priorDx, priorDy) * priorWeight;
     }
     // No reflective surface or light painted into the absorbing center.
     if (captured) radiance = vec3(0.0);
