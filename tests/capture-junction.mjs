@@ -1,6 +1,6 @@
 // Production angle/azimuth/distance evidence, plus actual orbit and flight video.
 // EH_CAPTURE_URL=... EH_CAPTURE_DIR=... EH_CAPTURE_SHA=<40 hex> node tests/capture-junction.mjs
-// EH_COMPARE_DIR=<baseline> verifies identical frozen matrices, not similar framing.
+// EH_COMPARE_DIR=<baseline> checks frozen poses, reporting tiny near-zero roundoff.
 import { chromium } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -135,13 +135,26 @@ try {
   if (process.env.EH_COMPARE_DIR) {
     const before = JSON.parse(await readFile(resolve(process.env.EH_COMPARE_DIR, 'receipts.json'), 'utf8'));
     assert.equal(before.frozen.length, receipt.frozen.length);
+    let maxCameraRoundoff = 0;
     for (const actual of receipt.frozen) {
       const baseline = before.frozen.find(view => view.name === actual.name); assert.ok(baseline);
       for (const key of ['camera', 'projection', 'time', 'profile', 'quality', 'raySteps', 'rayPixels', 'diskImageSize']) {
-        assert.deepEqual(JSON.parse(JSON.stringify(actual[key])), baseline[key], `${actual.name}: identical frozen ${key}`);
+        if (key === 'camera') {
+          assert.equal(actual.camera.length, 16); assert.equal(baseline.camera.length, 16);
+          actual.camera.forEach((value, index) => {
+            const expected = baseline.camera[index], error = Math.abs(value - expected);
+            // OrbitControls spherical reconstruction can differ by one float
+            // ULP near a zero axis. Retain raw uniforms and report that error;
+            // reject any meaningful pose difference, never normalize evidence.
+            assert.ok(value === expected || (Math.max(Math.abs(value), Math.abs(expected)) < 1e-6 && error < 1e-12), `${actual.name}: matched camera component ${index}`);
+            maxCameraRoundoff = Math.max(maxCameraRoundoff, error);
+          });
+        } else {
+          assert.deepEqual(JSON.parse(JSON.stringify(actual[key])), baseline[key], `${actual.name}: identical frozen ${key}`);
+        }
       }
     }
-    receipt.comparison = { baselineSha: before.sha, identicalFrozenMatrices: receipt.frozen.length };
+    receipt.comparison = { baselineSha: before.sha, matchedFrozenPoses: receipt.frozen.length, maxCameraRoundoff };
   }
   await save(); console.log(JSON.stringify({ frozen: receipt.frozen.length, videos: receipt.motion.length, comparison: receipt.comparison }));
 } finally { await browser.close(); }
