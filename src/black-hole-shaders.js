@@ -180,8 +180,14 @@ export const rayFragment = /* glsl */ `
         // disk exposure AFTER periapsis. Direct foreground stars stay 3D.
         // Start from a thin plane; the captured mean height corrects it below.
         if (uDiskEnabled > 0.0 && p.y * next.y < 0.0) {
-          vec3 hit = mix(p, next, -p.y / (next.y - p.y));
-          if (dot(hit, halfVelocity) > 0.0) {
+          float fraction = -p.y / (next.y - p.y);
+          vec3 hit = mix(p, next, fraction);
+          // Evaluate the direction at the crossing, not the segment midpoint.
+          // A hard dot(hit, halfVelocity)>0 gate exposes integration steps as
+          // sawtooth cuts through inclined arcs. Feather near periapsis instead.
+          vec3 hitVelocity = halfVelocity + acceleration(hit, h2) * ((fraction - 0.5) * dt);
+          float outgoing = smoothstep(-0.08, 0.25, dot(normalize(hit), normalize(hitVelocity)));
+          if (outgoing > 0.0) {
             vec3 worldHit = (uHoleToWorld * vec4(hit, 1.0)).xyz;
             vec2 uv = worldHit.xz / (2.0 * uDiskExtent) + 0.5;
             if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
@@ -207,7 +213,7 @@ export const rayFragment = /* glsl */ `
               float impact = length(origin + straight * closest);
               float occultationWeight = (1.0 - smoothstep(1.7, 3.8, impact)) *
                 smoothstep(0.0, 0.3, closest) * smoothstep(0.0, 0.3, sourceDistance - closest);
-              noteWeight = 1.1 * highlight * secondary * occultationWeight;
+              noteWeight = 1.1 * highlight * secondary * occultationWeight * outgoing;
             }
           }
         }

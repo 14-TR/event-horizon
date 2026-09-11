@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PerspectiveCamera, Vector3 } from 'three';
+import { PerspectiveCamera, Vector2, Vector3 } from 'three';
 import * as scene from '../src/scene.js';
 
 test('opening composition gives the shadow scale, a low inclination and title breathing room across viewports', () => {
@@ -35,13 +35,16 @@ test('resizing recomposes home in both directions without teleporting an explori
   view.homeTarget = new Vector3(...opening.target);
   view.camera.position.copy(view.homePosition);
   view.controls = { target: view.homeTarget.clone(), update() { view.camera.lookAt(this.target); }, saveState() {} };
-  view.renderer = { setSize() {}, getPixelRatio: () => 1.75 };
+  const viewport = new Vector2();
+  view.clusterObjects = new Map([[0, { glow: { material: { uniforms: { uViewport: { value: viewport } } } } }]]);
+  view.renderer = { setSize() {}, getPixelRatio: () => 1.75, getDrawingBufferSize: target => target.set(Math.floor(width * 1.75), Math.floor(height * 1.75)) };
   view.blackHole = { resize() {} };
   view.reportQuality = () => {};
   view.navigationMode = 'orbit';
   view.selectedCluster = null;
   width = 390; height = 844;
   view.resize();
+  assert.deepEqual(viewport.toArray(), [Math.floor(width * 1.75), Math.floor(height * 1.75)], 'volume occlusion uses the resized physical framebuffer, not CSS pixels or the ray budget');
   assert.deepEqual(view.homePosition.toArray(), scene.openingFrame(width, height).position, 'mobile home is recomposed, not the stale desktop camera');
   assert.ok(view.camera.position.equals(view.homePosition));
   width = 1440; height = 900;
