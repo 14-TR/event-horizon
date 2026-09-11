@@ -32,6 +32,7 @@ export class BlackHoleRenderer {
       uLensing: { value: 1 }, uStars: { value: 0.28 }, uDust: { value: 0 },
       uDiskImage: { value: null }, uDiskExtent: { value: 1 }, uDiskEnabled: { value: 0 },
       uImage: { value: this.target.texture },
+      uForegroundLight: { value: null }, uForegroundEnabled: { value: 0 },
       uTexel: { value: new THREE.Vector2(1, 1) },
       uExposure: { value: exposure }, uGlow: { value: glow },
     };
@@ -106,7 +107,7 @@ export class BlackHoleRenderer {
   }
 
   /** Full-frame replacement for renderer.render(scene, camera); preserves renderer state. */
-  render(renderer, camera, timeSeconds, foregroundScene = null) {
+  render(renderer, camera, timeSeconds, foregroundScene = null, foregroundLight = null) {
     if (!renderer.extensions.has('EXT_color_buffer_float')) {
       throw new Error('Black-hole pass requires WebGL2 EXT_color_buffer_float; retain a non-WebGL fallback.');
     }
@@ -122,6 +123,9 @@ export class BlackHoleRenderer {
       renderer.setRenderTarget(this.target);
       // setRenderTarget applies its physical-pixel viewport. setViewport would apply DPR twice.
       renderer.render(this.rayScene, this.passCamera);
+      foregroundLight?.render(renderer, camera);
+      this.uniforms.uForegroundLight.value = foregroundLight?.target.texture ?? null;
+      this.uniforms.uForegroundEnabled.value = foregroundLight ? 1 : 0;
       renderer.setRenderTarget(target);
       renderer.clear(true, true, false);
       renderer.render(this.compositeScene, this.passCamera);
