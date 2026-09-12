@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
+import { validateTopology } from './topology.js';
 import { observeJunction, hideJunctionOverlays, aimJunction, settleJunction } from './browser/junction-tools.js';
 import { openTools } from './browser/tools.js';
 
@@ -45,7 +46,10 @@ try {
       page.on('response', response => { if (response.ok()) resources.push(response.body().then(bytes => ({ url: response.url(), bytes: bytes.length, sha256: hash(bytes) }))); });
       await observeJunction(page);
       await page.addInitScript(quality => localStorage.setItem('eh-render-quality', quality), quality);
-      await page.goto(url); await page.waitForFunction(() => window.__junction.camera);
+      const topologyResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/graph.json'));
+      await page.goto(url);
+      const graph = validateTopology(await (await topologyResponse).json());
+      await page.waitForFunction(() => window.__junction.camera);
       const gpu = await page.evaluate(() => {
         const gl = document.querySelector('#observatory canvas').getContext('webgl2'), extension = gl.getExtension('WEBGL_debug_renderer_info');
         return gl.getParameter(extension ? extension.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
@@ -87,7 +91,7 @@ try {
         const repeat = await page.screenshot();
         assert.ok(bytes.equals(repeat), `${name}: frozen repetition`);
         assert.equal(actual.time, 0); assert.equal(actual.quality, quality);
-        assert.equal(actual.noteStars, '1675'); assert.equal(actual.diskSourceStars, '1675');
+        assert.equal(actual.noteStars, String(graph.nodes.length)); assert.equal(actual.diskSourceStars, String(graph.nodes.length));
         receipt.frozen.push({ name, profile, view, ...actual, worldDistance: Math.hypot(...actual.camera.slice(12, 15)) * 1.15, gpu, file, sha256: hash(bytes) });
         await save();
       }

@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { validateTopology } from '../topology.js';
+const graph = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url))));
 import { openTools } from './tools.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -229,17 +231,17 @@ test('bounded live-motion pacing receipt covers each real-graph quality without 
       await page.bringToFront();
       // Include normal user activation, and record headless scheduler state.
       await page.getByRole('button', { name: 'Cinematic view', exact: true }).click();
-      const measured = await page.evaluate(async () => {
+      const measured = await page.evaluate(async sectorCount => {
         const gl = document.querySelector('#observatory canvas').getContext('webgl2');
         const extension = gl.getExtension('WEBGL_debug_renderer_info');
-        // Time GPU work between source clear and all eight direct sector point
+        // Time GPU work between source clear and every occupied sector's direct point
         // AND envelope draws, regardless of their transparent render ordering,
         // rather than mistaking headless rAF/compositor stalls for GPU duration.
         const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2');
         const clear = gl.clear, draw = gl.drawArrays, instanced = gl.drawElementsInstanced, queries = [];
         let active = null, direct = 0, envelopes = 0;
         const finish = () => {
-          if (active && direct === 8 && envelopes === 8) {
+          if (active && direct === sectorCount && envelopes === sectorCount) {
             gl.endQuery(timer.TIME_ELAPSED_EXT); queries.push(active); active = null;
           }
         };
@@ -258,7 +260,9 @@ test('bounded live-motion pacing receipt covers each real-graph quality without 
           };
           gl.drawElementsInstanced = function (mode, count, type, offset, instances) {
             const result = instanced.call(gl, mode, count, type, offset, instances);
-            if (active && mode === gl.TRIANGLES && !gl.getParameter(gl.FRAMEBUFFER_BINDING)) { envelopes++; finish(); }
+            // Direct envelopes now render offscreen; identify their real shader,
+            // not the default framebuffer used by an older rendering path.
+            if (active && mode === gl.TRIANGLES && gl.getUniformLocation(gl.getParameter(gl.CURRENT_PROGRAM), 'uRayDepth') !== null) { envelopes++; finish(); }
             return result;
           };
         }
@@ -282,14 +286,16 @@ test('bounded live-motion pacing receipt covers each real-graph quality without 
           gpu: extension ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
           samples: samples.length, medianMs: samples[Math.floor(samples.length / 2)], p95Ms: samples[Math.floor(samples.length * 0.95)],
           visibility: document.visibilityState, focused: document.hasFocus(), gpuSamples: gpuTimes.length,
+          gpuTimerAvailable: Boolean(timer), gpuDisjoint: disjoint,
           gpuMedianMs: gpuTimes.length ? gpuTimes[Math.floor(gpuTimes.length / 2)] : null,
           gpuP95Ms: gpuTimes.length ? gpuTimes[Math.floor(gpuTimes.length * 0.95)] : null,
           glError: gl.getError(), ...document.getElementById('observatory').dataset,
         };
-      });
-      expect(measured.noteStars).toBe('1675');
-      expect(measured.diskSourceStars).toBe('1675');
+      }, graph.clusters.filter(cluster => cluster.count > 0).length);
+      expect(measured.noteStars).toBe(String(graph.nodes.length));
+      expect(measured.diskSourceStars).toBe(String(graph.nodes.length));
       expect(measured.glError).toBe(0);
+      if (measured.gpuTimerAvailable && !measured.gpuDisjoint) expect(measured.gpuSamples, 'available GPU timers must finish complete source/envelope frames').toBeGreaterThan(0);
       expect(errors).toEqual([]);
       receipts.push({ ...setting, ...measured });
     } finally { await context.close(); }

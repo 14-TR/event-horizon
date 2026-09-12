@@ -66,6 +66,8 @@ export async function aimJunction(page, elevation, azimuth, { steps = 5 } = {}) 
 }
 
 // A local widest-path bottleneck, not total image brightness or a synthetic arc.
+// Calibrated only for fixtures/junction-topology.json at 1200x900, DPR 1,
+// frozen t=0, elevation 30 / azimuth 0. Never apply to a mutable daily export.
 // The box bounds the reproduced LEFT junction and forbids a route around the
 // opposite side of the hole. A 5px analysis average rejects isolated star cores.
 export async function junctionStrength(page, screenshot) {

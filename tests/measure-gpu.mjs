@@ -7,6 +7,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
+import { validateTopology } from './topology.js';
 
 const variants = JSON.parse(process.env.EH_GPU_VARIANTS || '[]');
 assert.ok(variants.length >= 2, 'supply at least two immutable production URLs');
@@ -91,19 +92,22 @@ try {
               },
             };
           });
+          const topologyResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/graph.json'));
           await page.goto(variant.url);
+          const graph = validateTopology(await (await topologyResponse).json());
           await page.waitForFunction(warm => document.querySelector('#observatory')?.dataset.renderer === 'webgl' && window.__gpu?.ready() >= warm, warmupFrames, { timeout: 60000 });
           await page.evaluate(() => window.__gpu.start());
           await page.waitForFunction(count => window.__gpu.count() >= count, sampleCount, { timeout: 60000 });
           const actual = await page.evaluate(() => ({ ...window.__gpu.read(), ...document.querySelector('#observatory').dataset }));
+          // Four source draws per occupied sector, plus two trails, rays and composite.
           const samples = actual.samples.slice(0, sampleCount);
           assert.equal(samples.length, sampleCount);
           assert.equal(actual.disjoint, false, 'disjoint timer results are not valid evidence');
           assert.deepEqual(actual.glErrors, []); assert.deepEqual(errors, []);
-          assert.equal(actual.noteStars, '1675'); assert.equal(actual.diskSourceStars, '1675');
+          assert.equal(actual.noteStars, String(graph.nodes.length)); assert.equal(actual.diskSourceStars, String(graph.nodes.length));
           assert.equal(actual.observed.time, 0);
           assert.ok(!/swiftshader|llvmpipe|software/i.test(actual.gpuRenderer), 'hardware acceptance cannot use a software renderer');
-          assert.ok(samples.every(s => s.draws === 36), 'timer must contain every production source, volume, ray, composite and foreground draw');
+          assert.ok(samples.every(s => s.draws === 4 * graph.clusters.filter(cluster => cluster.count > 0).length + 4), 'timer must contain every production source, volume, ray, composite and foreground draw');
           const previous = receipt.runs.find(r => r.view.name === view.name);
           if (previous) assert.deepEqual(actual.observed, previous.observed, 'all variants/rounds must use exactly the same frozen camera and time');
           const run = { round, variant: variant.name, sha: variant.sha, view, ...actual, samples, medianMs: median(samples.map(s => s.ms)), p95Ms: samples.map(s => s.ms).sort((a, b) => a - b)[Math.floor(sampleCount * 0.95)], resources: await Promise.all(resources), errors };

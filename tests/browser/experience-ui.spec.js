@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { validateTopology, connectedPair } from '../topology.js';
 
-const graph = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url)));
+const graph = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url))));
+const fmt = n => new Intl.NumberFormat('en-US').format(n);
 const byId = new Map(graph.nodes.map(node => [node.id, node]));
 const adjacency = new Map(graph.nodes.map(node => [node.id, new Set()]));
 for (const [a, b] of graph.edges) { adjacency.get(a).add(b); adjacency.get(b).add(a); }
-const hub = [...graph.nodes].sort((a, b) => adjacency.get(b.id).size - adjacency.get(a.id).size)[0];
+const hub = byId.get(connectedPair(graph).id);
 
 async function topologyOnly(page) {
   // Exercise the actual UI and actual approved topology without competing GPU work.
@@ -32,15 +34,21 @@ test('real hub has bounded neighbors, last-page access and cross-sector Back his
   await topologyOnly(page);
   await expect(page.locator('#neighbor-explorer')).toBeVisible();
   await openNeighbors(page);
-  await expect(page.locator('#node-degree')).toHaveText('814');
-  await expect(page.locator('[data-neighbor]')).toHaveCount(6);
+  const degree = adjacency.get(hub.id).size;
+  expect(degree).toBeGreaterThan(0);
+  await expect(page.locator('#node-degree')).toHaveText(fmt(degree));
+  await expect(page.locator('[data-neighbor]')).toHaveCount(Math.min(6, degree));
   const lastPage = Math.ceil(adjacency.get(hub.id).size / 6);
   await page.getByLabel('Go to connection page', { exact: true }).fill(String(lastPage));
   await page.getByLabel('Go to connection page', { exact: true }).press('Enter');
-  await expect(page.locator('#neighbor-range')).toHaveText('811–814 of 814');
-  await expect(page.locator('[data-neighbor]')).toHaveCount(4);
+  const start = (lastPage - 1) * 6 + 1;
+  await expect(page.locator('#neighbor-range')).toHaveText(`${fmt(start)}–${fmt(degree)} of ${fmt(degree)}`);
+  await expect(page.locator('[data-neighbor]')).toHaveCount(degree - start + 1);
   await page.getByLabel('Connection scope', { exact: true }).selectOption('cross');
-  await page.getByRole('button', { name: 'Next connections', exact: true }).click();
+  const next = page.getByRole('button', { name: 'Next connections', exact: true });
+  const crossCount = [...adjacency.get(hub.id)].filter(id => byId.get(id).cluster !== hub.cluster).length;
+  if (crossCount > 6) { await expect(next).toBeEnabled(); await next.click(); }
+  else await expect(next).toBeDisabled();
   const beforeRange = await page.locator('#neighbor-range').textContent();
   const destination = await page.locator('[data-neighbor]').first().getAttribute('data-neighbor');
   expect(adjacency.get(hub.id).has(destination)).toBe(true);
@@ -89,7 +97,9 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
     await openNeighbors(page);
-    await page.getByRole('button', { name: 'Next connections', exact: true }).click();
+    const next = page.getByRole('button', { name: 'Next connections', exact: true });
+    if (adjacency.get(hub.id).size > 6) { await expect(next).toBeEnabled(); await next.click(); }
+    else await expect(next).toBeDisabled();
     for (const id of ['node-select', 'locate-button', 'close-tools']) await expect(page.locator(`#${id}`)).toBeInViewport();
     expect(await page.locator('#explore-tools').evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
     expect((await page.locator('#explore-tools').boundingBox()).height).toBeLessThanOrEqual(viewport.height * 0.53);

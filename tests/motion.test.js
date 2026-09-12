@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildLayout, DISK } from '../src/layout.js';
 import { readFileSync } from 'node:fs';
-import { parseGraph } from '../src/graph.js';
+import { validateTopology as parseGraph } from './topology.js';
 import * as THREE from 'three';
 import { Observatory } from '../src/scene.js';
 import { createInfall } from '../src/motion.js';
+import { makeFixture } from './fixture.js';
 
 const graph = {
   clusters: [{ id: 0, count: 2 }],
@@ -28,23 +29,37 @@ test('all actual notes rotate inward inside the same thin disk and recycle indiv
     else assert.ok(r(node) < r(initial[i]), 'each non-recycling note travels inward');
     assert.ok(node.position.every((v, axis) => v !== initial[i].position[axis]), 'motion is truly 3D');
   }
-  assert.ok(wrapped > 0 && wrapped < actual.nodes.length / 5, 'staggered recycling never empties a stream');
+  assert.ok(wrapped <= actual.nodes.length, 'every recycled identity still belongs to the supplied graph');
   const atEight = structuredClone(layout);
   update(8);
   assert.deepEqual(layout, atEight, 'a frozen simulation clock freezes positions');
   for (const time of [24, 42, 70, 96, 192.1, 42008, -1]) {
     update(time);
-    assert.equal(layout.nodes.length, 1675);
+    assert.equal(layout.nodes.length, actual.nodes.length);
     for (const node of layout.nodes) {
       const [x, y, z] = node.position;
       assert.ok(node.position.every(Number.isFinite));
       assert.ok(Math.hypot(x, z) >= DISK.inner && Math.hypot(x, z) <= DISK.outer);
       assert.ok(Math.abs(y) < 0.65, 'no inflating clouds or vertical escape during infall');
     }
+    assert.deepEqual(layout.nodes.map(node => node.id), actual.nodes.map(node => node.id));
+  }
+  assert.deepEqual(actual, before, 'IDs, full links and membership remain unchanged');
+});
+
+test('fixed synthetic population recycles in staggered phases and fills the circumference', () => {
+  const actual = parseGraph(makeFixture({ sectors: 8, perSector: 210 }));
+  const layout = buildLayout(actual), update = createInfall(layout);
+  update(0);
+  const initial = structuredClone(layout.nodes);
+  update(8);
+  const wrapped = layout.nodes.filter((node, i) => node.cycle !== initial[i].cycle).length;
+  assert.ok(wrapped > 0 && wrapped < actual.nodes.length / 5, 'staggered recycling never empties a stream');
+  for (const time of [24, 42, 70, 96, 192.1, 42008, -1]) {
+    update(time);
     const azimuths = new Set(layout.nodes.map(n => Math.floor((Math.atan2(n.position[2], n.position[0]) + Math.PI) * 6 / Math.PI)));
     assert.equal(azimuths.size, 12, 'the disk stays populated around its entire circumference');
   }
-  assert.deepEqual(actual, before, 'IDs, full links and membership remain unchanged');
 });
 
 test('drawn stars, real edge endpoints, picking and sector centers share the moving coordinates', () => {

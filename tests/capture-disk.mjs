@@ -5,6 +5,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
+import { validateTopology } from './topology.js';
 
 const directory = resolve(process.env.EH_CAPTURE_DIR || 'test-results/disk-frozen');
 const url = process.env.EH_CAPTURE_URL || 'http://127.0.0.1:4175/event-horizon/';
@@ -43,7 +44,9 @@ try {
           return scalar.call(this, location, value);
         };
       });
+      const topologyResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/graph.json'));
       await page.goto(url);
+      const graph = validateTopology(await (await topologyResponse).json());
       await page.waitForFunction(() => document.querySelector('#observatory')?.dataset.renderer === 'webgl' && window.__frozenDisk.camera);
       if (view.dy) {
         await page.mouse.move(750, 490); await page.mouse.down();
@@ -61,8 +64,8 @@ try {
       assert.equal(sha(image), sha(repeated), `${view.name}: repeated frozen canvas is identical`);
       const actual = await page.evaluate(() => ({ ...window.__frozenDisk, ...document.querySelector('#observatory').dataset }));
       assert.equal(actual.time, 0);
-      assert.equal(actual.noteStars, '1675');
-      assert.equal(actual.diskSourceStars, '1675');
+      assert.equal(actual.noteStars, String(graph.nodes.length));
+      assert.equal(actual.diskSourceStars, String(graph.nodes.length));
       if (view.name === 'edge-on') assert.ok(Math.abs(actual.camera[13]) < 0.001, 'edge-on camera really has zero hole-frame height');
       assert.deepEqual(errors, []);
       const receipt = { ...view, ...actual, sha256: sha(image), path: `${directory}/${view.name}.png` };

@@ -5,7 +5,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { locateRegion, nodeFrame, travelPosition } from '../src/node-locate.js';
 import { buildLayout } from '../src/layout.js';
 import { createInfall } from '../src/motion.js';
-import { parseGraph } from '../src/graph.js';
+import { validateTopology as parseGraph } from './topology.js';
 
 test('safe-rectangle framing covers every real note at two animation phases and portrait/desktop aspects', () => {
   const graph = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
