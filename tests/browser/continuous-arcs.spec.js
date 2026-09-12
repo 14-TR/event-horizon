@@ -33,14 +33,15 @@ test('periapsis transition has no staircase cut across continuous source radianc
       const w = hole.target.width, h = hole.target.height, data = new Uint16Array(w * h * 4);
       renderer.readRenderTargetPixels(hole.target, 0, 0, w, h, data);
       const at = (x, y, c) => T.DataUtils.fromHalfFloat(data[(y * w + x) * 4 + c]);
-      let maxJump = 0, bright = 0;
+      let maxJump = 0, bright = 0, jumpAt = null;
       for (let y = Math.ceil(h * 0.56); y < h * 0.82; y++) for (let x = Math.ceil(w * 0.22); x < w * 0.78; x++) {
         if (at(x, y, 3) <= 0 || at(x + 1, y, 3) <= 0 || at(x, y + 1, 3) <= 0) continue;
         const value = at(x, y, 0);
         if (value > 0.1) bright++;
-        maxJump = Math.max(maxJump, Math.abs(value - at(x + 1, y, 0)), Math.abs(value - at(x, y + 1, 0)));
+        const jump = Math.max(Math.abs(value - at(x + 1, y, 0)), Math.abs(value - at(x, y + 1, 0)));
+        if (jump > maxJump) { maxJump = jump; jumpAt = { x, y, w, h, value, right: at(x + 1, y, 0), up: at(x, y + 1, 0) }; }
       }
-      result.push({ quality, maxJump, bright, error: renderer.getContext().getError() }); hole.dispose();
+      result.push({ quality, maxJump, jumpAt, bright, error: renderer.getContext().getError() }); hole.dispose();
     }
     image.dispose(); renderer.dispose(); return result;
   });
