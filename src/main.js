@@ -74,7 +74,7 @@ let explorer;
 const markers = new Map();
 const clusterName = id => graph?.clusters.find(cluster => cluster.id === id)?.label || 'all streams';
 
-function renderNeighbors() {
+function renderNeighbors({ reveal = false } = {}) {
   const result = explorer.neighbors();
   $('node-degree').textContent = format(result.total);
   $('connection-summary').textContent = `${format(result.within)} within stream · ${format(result.cross)} cross-sector`;
@@ -111,6 +111,20 @@ function renderNeighbors() {
     });
     item.append(button);
     list.append(item);
+  }
+  if (reveal && list.firstElementChild) {
+    const first = list.firstElementChild.firstElementChild;
+    // Move focus with the results, not to a now-offscreen pager. Only scroll
+    // the existing viewport; metadata at scrollTop 0 can fill a small phone.
+    const body = list.closest('.neighbor-body');
+    const scroller = getComputedStyle(body).overflowY === 'auto' ? body : $('explore-tools');
+    const port = scroller.getBoundingClientRect();
+    const row = first.getBoundingClientRect();
+    const top = port.top + scroller.clientTop + 5; // Room for the focus outline.
+    const bottom = port.top + scroller.clientTop + scroller.clientHeight - 5;
+    if (row.top < top || row.bottom > bottom) scroller.scrollTop += row.top - top;
+    // Focus last: blurring a changed page input can synchronously rerender.
+    first.focus({ preventScroll: true });
   }
 }
 
@@ -201,12 +215,26 @@ $('neighbor-explorer').addEventListener('toggle', () => {
   if (narrowQuery.matches && !cinematic && $('neighbor-explorer').open) locateSelected();
 });
 $('history-back').addEventListener('click', () => { const sourceId = selectedNode?.id; if (explorer?.back()) applyContext({ sourceId, locate: true }); });
-$('neighbor-filter').addEventListener('change', event => { explorer.setFilter(event.target.value); renderNeighbors(); });
-$('neighbor-prev').addEventListener('click', () => { explorer.setPage(explorer.current.page - 1); renderNeighbors(); });
-$('neighbor-next').addEventListener('click', () => { explorer.setPage(explorer.current.page + 1); renderNeighbors(); });
-$('neighbor-page').addEventListener('change', event => { explorer.setPage(Number(event.target.value) - 1); renderNeighbors(); });
+$('neighbor-filter').addEventListener('change', event => { explorer.setFilter(event.target.value); renderNeighbors({ reveal: true }); });
+for (const [id, step] of [['neighbor-prev', -1], ['neighbor-next', 1]]) {
+  $(id).addEventListener('mousedown', event => {
+    // Keep a pending edit focused until click: blur would reveal results and
+    // move this button away before pointer release. Cancellation leaves editing intact.
+    if (event.button === 0 && document.activeElement === $('neighbor-page')) event.preventDefault();
+  });
+  $(id).addEventListener('click', () => {
+    if (document.activeElement === $('neighbor-page')) explorer.setPage(Number($('neighbor-page').value) - 1);
+    explorer.setPage(explorer.current.page + step);
+    renderNeighbors({ reveal: true });
+  });
+}
+$('neighbor-page').addEventListener('change', event => { explorer.setPage(Number(event.target.value) - 1); renderNeighbors({ reveal: true }); });
 $('neighbor-page').addEventListener('keydown', event => {
-  if (event.key === 'Enter') { explorer.setPage(Number(event.target.value) - 1); renderNeighbors(); }
+  if (event.key === 'Enter') {
+    event.preventDefault(); // Do not activate the neighbor that receives focus.
+    explorer.setPage(Number(event.target.value) - 1);
+    renderNeighbors({ reveal: true });
+  }
 });
 
 function renderSectors() {
