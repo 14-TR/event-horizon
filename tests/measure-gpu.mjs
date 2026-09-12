@@ -95,6 +95,9 @@ try {
           const topologyResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/graph.json'));
           await page.goto(variant.url);
           const graph = validateTopology(await (await topologyResponse).json());
+          // Compare complete validated workloads, not just per-run population/draw totals.
+          if (receipt.topology) assert.deepEqual(graph, receipt.topology, 'all variants/rounds must use exactly the same validated topology');
+          else receipt.topology = graph;
           await page.waitForFunction(warm => document.querySelector('#observatory')?.dataset.renderer === 'webgl' && window.__gpu?.ready() >= warm, warmupFrames, { timeout: 60000 });
           await page.evaluate(() => window.__gpu.start());
           await page.waitForFunction(count => window.__gpu.count() >= count, sampleCount, { timeout: 60000 });

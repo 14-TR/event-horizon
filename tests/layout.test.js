@@ -26,6 +26,11 @@ test('every actual note maps exactly once into a shared thin 3D spiral disk, not
   assert.deepEqual(graph, before, 'the full valid graph remains unchanged');
 });
 
+test('fixed reviewed sectors retain distinct colors', () => {
+  const layout = buildLayout(distributionGraph);
+  assert.equal(new Set(layout.clusters.map(cluster => cluster.color)).size, distributionGraph.clusters.length);
+});
+
 test('fixed reviewed populous streams have true depth and span the complete disk', () => {
   const layout = buildLayout(distributionGraph);
   assert.ok(new Set(layout.nodes.map(n => Math.round(n.position[1] * 100))).size > 30, 'true depth, not a flat plane');
