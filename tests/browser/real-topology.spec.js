@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { openTools } from './tools.js';
 import { readFileSync } from 'node:fs';
+import { validateTopology } from '../topology.js';
 
-const raw = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8'));
+const raw = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8')));
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
 
 test('real public topology has truthful counts and discoverable tiny sectors', async ({ page, baseURL }) => {

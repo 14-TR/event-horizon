@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { validateTopology, connectedPair } from '../topology.js';
 import { makeFixture } from '../fixture.js';
 import { openTools } from './tools.js';
 
@@ -13,11 +14,11 @@ import { openTools } from './tools.js';
  * WebGL uniform observation is passive, verification-only and works in builds.
  * Run one worker; these are interaction checks, not GPU/performance gates.
  */
-const raw = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8'));
+const raw = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8')));
 const byId = new Map(raw.nodes.map(node => [node.id, node]));
 const adjacency = new Map(raw.nodes.map(node => [node.id, new Set()]));
 for (const [a, b] of raw.edges) { adjacency.get(a).add(b); adjacency.get(b).add(a); }
-const hub = [...raw.nodes].sort((a, b) => adjacency.get(b.id).size - adjacency.get(a.id).size || a.id.localeCompare(b.id))[0];
+const hub = byId.get(connectedPair(raw).id);
 const cross = byId.get([...adjacency.get(hub.id)].sort().find(id => byId.get(id).cluster !== hub.cluster));
 const sectorIds = [...raw.clusters].map(cluster => cluster.id).sort((a, b) => a - b);
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
@@ -69,7 +70,7 @@ async function load(page, { fixture = false } = {}) {
   if (fixture) await page.route('**/graph.json', route => route.fulfill({ json: makeFixture({ sectors: 3, perSector: 12 }) }));
   const response = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/graph.json'));
   await page.goto('./');
-  if (!fixture) expect(await (await response).json()).toEqual(raw);
+  if (!fixture) expect(validateTopology(await (await response).json())).toEqual(raw);
   await expect(page.locator('#app')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
   await expect.poll(() => page.evaluate(() => window.__gravityCamera.uploads)).toBeGreaterThan(0);

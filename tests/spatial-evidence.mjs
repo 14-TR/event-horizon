@@ -9,13 +9,15 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
+import { validateTopology, connectedPair } from './topology.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const directory = resolve(process.env.EH_SPATIAL_DIR || `${root}/test-results/spatial-probe`);
 const bundle = `${directory}/bundle`;
 await mkdir(bundle, { recursive: true });
 await build({ configFile: false, root, publicDir: false, logLevel: 'warn', build: { target: 'es2022', outDir: bundle, emptyOutDir: true, lib: { entry: `${root}/src/scene.js`, formats: ['es'], fileName: () => 'scene.js' } } });
-const graph = JSON.parse(await readFile(`${root}/public/graph.json`, 'utf8'));
+const graph = validateTopology(JSON.parse(await readFile(`${root}/public/graph.json`, 'utf8')));
+const { id: hubId, neighborId: crossId } = connectedPair(graph);
 await writeFile(`${bundle}/graph.json`, JSON.stringify(graph));
 const html = `<!doctype html><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 html,body,#host{margin:0;width:100%;height:100%;overflow:hidden;background:#030407}#host{position:absolute;inset:0}canvas{display:block;width:100%;height:100%}
@@ -72,7 +74,7 @@ try {
       };
     }, safeRect);
     const states = [];
-    for (const [id, neighbor] of [['n001614', 'n000002'], ['n000002', 'n001614'], ['n001614', 'n000002']]) {
+    for (const [id, neighbor] of [[hubId, crossId], [crossId, hubId], [hubId, crossId]]) {
       const state = await page.evaluate(([id, neighbor]) => window.follow(id, neighbor), [id, neighbor]);
       assert.equal(state.located, true); assert.equal(state.flight, false); assert.equal(state.point.visible, true);
       assert.ok(state.point.x > safeRect.left && state.point.x < safeRect.left + safeRect.width);
@@ -95,30 +97,30 @@ try {
       await page.screenshot({ path });
       states.push({ id, neighbor, ...state, visibleSource, screenshot: path });
     }
-    const provenance = await page.evaluate(() => {
+    const provenance = await page.evaluate(crossId => {
       const id = probe.selectedNode.id;
       probe.setConnectionContext(null);
       const pixels = () => { probe.drawFrame(); const target = probe.diskRadiance.target, a = new Uint16Array(target.width * target.height * 4); probe.renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, a); return a; };
       const before = pixels(), beforeCalls = probe.renderer.info.render.calls;
-      const context = probe.setConnectionContext(id, 'n000002'); const after = pixels();
+      const context = probe.setConnectionContext(id, crossId); const after = pixels();
       return { equal: before.every((value, i) => value === after[i]), foregroundDrawDelta: probe.renderer.info.render.calls - beforeCalls, context, noteStars: probe.host.dataset.noteStars, diskSourceStars: probe.host.dataset.diskSourceStars, sourceObjects: probe.diskRadiance.entries.length, overlayCaptured: probe.diskRadiance.entries.some(e => e.source === probe.connections.line) };
-    });
+    }, crossId);
     assert.equal(provenance.equal, true, 'connection annotations never contaminate disk capture');
     assert.equal(provenance.foregroundDrawDelta, 1, 'selection adds only one bounded foreground line draw');
-    assert.equal(provenance.noteStars, '1675'); assert.equal(provenance.diskSourceStars, '1675'); assert.equal(provenance.overlayCaptured, false);
+    assert.equal(provenance.noteStars, String(graph.nodes.length)); assert.equal(provenance.diskSourceStars, String(graph.nodes.length)); assert.equal(provenance.overlayCaptured, false);
     let motion = null;
     if (width === 390) {
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.evaluate(() => { probe.setPaused(false); window.follow('n000002', 'n001614'); });
+      await page.evaluate(([crossId, hubId]) => { probe.setPaused(false); window.follow(crossId, hubId); }, [crossId, hubId]);
       await page.waitForFunction(() => !probe.flight && probe.time > 0.15);
       motion = await page.evaluate(() => ({ time: probe.time, point: probe.project(probe.selectedNode.position, true), endpoints: Array.from(probe.connections.line.geometry.attributes.position.array.slice(0, 6)), expected: [...probe.connections.node.position, ...probe.connections.neighbors[0].position] }));
       assert.equal(motion.point.visible, true);
       motion.endpoints.forEach((value, i) => assert.ok(Math.abs(value - motion.expected[i]) < 1e-5));
       await page.screenshot({ path: `${directory}/390-moving-endpoint.png` });
-      await page.evaluate(() => window.follow('n001614', 'n000002'));
+      await page.evaluate(([hubId, crossId]) => window.follow(hubId, crossId), [hubId, crossId]);
       await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(140, 180); await page.mouse.up();
       assert.equal(await page.evaluate(() => Boolean(probe.locating || probe.flight)), false, 'real manual pointer input cancels');
-      await page.evaluate(() => { probe.setNavigationMode('fly'); probe.locateNode('n001614', { safeRect: window.safeRect }); });
+      await page.evaluate(hubId => { probe.setNavigationMode('fly'); probe.locateNode(hubId, { safeRect: window.safeRect }); }, hubId);
       await page.keyboard.down('w'); await page.keyboard.up('w');
       assert.equal(await page.evaluate(() => Boolean(probe.locating || probe.flight)), false, 'real flight key cancels');
       await page.emulateMedia({ reducedMotion: 'reduce' });
