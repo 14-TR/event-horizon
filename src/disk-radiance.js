@@ -108,7 +108,8 @@ export class DiskRadiance {
     this.scene.add(this.trailImage);
   }
 
-  render(renderer) {
+  render(renderer, timeSeconds = 0) {
+    this.envelopeMaterial.uniforms.uFlowPhase.value = timeSeconds * DISK.rotation;
     // Three uploads attributes while building its render list, BEFORE calling
     // mesh.onBeforeRender. Synchronize here so a paused source edit reaches the
     // very next capture, rather than showing stale color/height for one frame.

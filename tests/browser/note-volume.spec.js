@@ -7,6 +7,7 @@ for (const bounded of [false, true]) test(`one real note retains finite light at
     'three.js': '../../node_modules/three/build/three.module.js',
     'three.core.js': '../../node_modules/three/build/three.core.js',
     'note-light.js': '../../src/note-light.js',
+    'layout.js': '../../src/layout.js',
     'black-hole-shaders.js': '../../src/black-hole-shaders.js',
   };
   await page.route('**/__volume/*', route => {

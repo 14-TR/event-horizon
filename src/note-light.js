@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DISK } from './layout.js';
 
 // One bounded, flow-aligned emitting volume per actual note. The box is only a
 // ray-integration bound: its faces never contribute light. No synthetic sources.
@@ -12,7 +13,7 @@ export function noteLightVertex(capture = false) {
     varying vec3 vOrigin;
     varying vec3 vHalfSize;
     varying vec3 vEmission;
-    varying float vSeed;
+    varying vec2 vDiskCenter;
     varying float vHeight;
     varying float vCurve;
     varying float vWorldScale;
@@ -26,7 +27,7 @@ export function noteLightVertex(capture = false) {
       vHalfSize = vec3(1.15 + aSize * 0.035, 0.48 + aSize * 0.012, 0.12 + aSize * 0.004);
       vLocal = position;
       vEmission = aEmission;
-      vSeed = aSize * 13.61;
+      vDiskCenter = aPosition.xz;
       vCurve = vHalfSize.x * vHalfSize.x / (2.0 * radius * vHalfSize.y);
       vec4 world = modelMatrix * vec4(aPosition + basis * (position * vHalfSize), 1.0);
       vHeight = (modelMatrix * vec4(aPosition, 1.0)).y;
@@ -40,9 +41,11 @@ export function noteLightVertex(capture = false) {
   `;
 }
 
-// Shared direct/capture transfer, evaluated in the source's co-moving frame.
-// Domain-warped finite wisps, not periodic global rings or independent gas noise.
+// Shared direct/capture transfer. A coherent disk-space modulation belongs only
+// to finite actual-source columns: overlapping notes reinforce their wisps
+// rather than averaging unrelated per-note noise into a smooth luminous torus.
 export const noteLightProfile = /* glsl */ `
+  uniform float uFlowPhase;
   float grain(vec2 p) {
     vec2 i = floor(p), f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -50,21 +53,34 @@ export const noteLightProfile = /* glsl */ `
       dot(i + vec2(0, 1), vec2(127.1, 311.7)), dot(i + vec2(1), vec2(127.1, 311.7)))) * 43758.5453);
     return mix(mix(h.x, h.y, f.x), mix(h.z, h.w, f.x), f.y);
   }
-  float noteStructure(vec3 p, float seed) {
-    float warp = grain(vec2(p.x * 2.1, p.y * 3.0) + seed) - 0.5;
-    float filament = grain(vec2(p.x * 2.7, p.y * 17.0 + warp * 3.5) + seed);
-    float torn = grain(vec2(p.x * 6.0, p.y * 9.0) - seed);
-    return (0.24 + filament * filament * 1.6) * (0.65 + torn * 0.65);
+  float noteStructure(vec2 disk) {
+    // Undo the actual disk's common rotation. Sources still follow their own
+    // inward trajectories through this artistic, slowly advected light grade.
+    disk = mat2(cos(uFlowPhase), sin(uFlowPhase), -sin(uFlowPhase), cos(uFlowPhase)) * disk;
+    float warp = grain(disk * 0.7) - 0.5;
+    float twist = length(disk) * 1.65 + warp * 0.9;
+    // Cartesian twisting is continuous across the polar seam. Nonperiodic
+    // radial shear stretches finite eddies along flow, not concentric stripes.
+    vec2 flow = mat2(cos(twist), -sin(twist), sin(twist), cos(twist)) * disk * 0.85;
+    float filament = grain(flow);
+    float torn = grain(flow * 0.47 + vec2(18.1, -7.3));
+    float wisps = 0.12 + 1.65 * filament * filament * (0.4 + torn * 0.9);
+    // Preserve the incandescent inner reservoir; introduce high contrast only
+    // as actual source light grades toward copper. This still multiplies the
+    // finite note column below and cannot emit into empty disk space.
+    return mix(0.7, wisps, smoothstep(4.8, 5.8, length(disk)));
   }
   float columnIntegral(float t) {
     float t2 = t * t;
     return t * (1.0 - (2.0 / 3.0) * t2 + 0.2 * t2 * t2);
   }
-  vec3 noteEmission(vec3 origin, vec3 end, vec3 halfSize, vec3 color, float seed, float curve, float limit) {
+  vec3 noteEmission(vec3 origin, vec3 end, vec3 halfSize, vec3 color, vec2 diskCenter, float curve, float limit) {
     vec3 direction = normalize((end - origin) * halfSize) / halfSize;
     float a = dot(direction, direction);
     float closest = -dot(origin, direction) / a;
     vec3 peak = origin + direction * closest;
+    vec2 radial = diskCenter / max(length(diskCenter), 0.1);
+    vec2 disk = diskCenter + vec2(-radial.y, radial.x) * peak.x * halfSize.x + radial * peak.y * halfSize.y;
     // Bend the finite source column along the disk flow. Turbulence is sampled
     // at its closest point, not marched eight times through nearly equal wisps.
     // This is a column-filtered volume approximation, not full volume transport.
@@ -80,7 +96,7 @@ export const noteLightProfile = /* glsl */ `
     // Exact integral of the compact (1-r²)² kernel, clipped by ray depth. A
     // finite polynomial column has smooth edges and no box-face contribution.
     float light = support * support * halfLength * (columnIntegral(leave) - columnIntegral(enter));
-    return color * noteStructure(peak, seed) * light * 0.15 / (2.0 * halfSize.z);
+    return color * noteStructure(disk) * light * 0.15 / (2.0 * halfSize.z);
   }
 `;
 
@@ -88,6 +104,7 @@ export function noteLightMaterial(capture = false, extent = 1) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uExtent: { value: extent }, uRayDepth: { value: null },
+      uFlowPhase: { value: 0 },
       uOcclusion: { value: 0 }, uViewport: { value: new THREE.Vector2(1, 1) },
     },
     vertexShader: noteLightVertex(capture),
@@ -96,7 +113,7 @@ export function noteLightMaterial(capture = false, extent = 1) {
       varying vec3 vOrigin;
       varying vec3 vHalfSize;
       varying vec3 vEmission;
-      varying float vSeed;
+      varying vec2 vDiskCenter;
       varying float vHeight;
       varying float vCurve;
       varying float vWorldScale;
@@ -109,7 +126,7 @@ export function noteLightMaterial(capture = false, extent = 1) {
         // preserves foreground emission and removes triangular shadow cutouts.
         float limit = 60000.0;
         ${capture ? '' : 'if (uOcclusion > 0.0) limit = abs(texture2D(uRayDepth, gl_FragCoord.xy / uViewport).a) / vWorldScale;'}
-        vec3 emission = noteEmission(vOrigin, vLocal, vHalfSize, vEmission, vSeed, vCurve, limit);
+        vec3 emission = noteEmission(vOrigin, vLocal, vHalfSize, vEmission, vDiskCenter, vCurve, limit);
         // Direct screen accumulation composes exponential exposures without
         // clipping the overlapping inner body. Capture remains additive HDR.
         ${capture ? '' : 'emission = 1.0 - exp(-emission * 1.35);'}
@@ -148,10 +165,11 @@ export class NoteLightPass {
     for (const { image } of this.entries) image.material.uniforms.uViewport.value.set(width, height);
   }
 
-  render(renderer, camera) {
+  render(renderer, camera, timeSeconds = 0) {
     // Borrow live geometry/materials, but never source IDs or picking. Updating
     // before renderer.render also reaches the next paused frame's GPU upload.
     for (const { source, image } of this.entries) {
+      image.material.uniforms.uFlowPhase.value = timeSeconds * DISK.rotation;
       source.onBeforeRender();
       source.updateWorldMatrix(true, false);
       image.matrix.copy(source.matrixWorld);

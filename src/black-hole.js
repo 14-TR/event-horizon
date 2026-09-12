@@ -119,11 +119,11 @@ export class BlackHoleRenderer {
     try {
       renderer.autoClear = false;
       renderer.setScissorTest(false);
-      this.diskRadiance?.render(renderer);
+      this.diskRadiance?.render(renderer, timeSeconds);
       renderer.setRenderTarget(this.target);
       // setRenderTarget applies its physical-pixel viewport. setViewport would apply DPR twice.
       renderer.render(this.rayScene, this.passCamera);
-      foregroundLight?.render(renderer, camera);
+      foregroundLight?.render(renderer, camera, timeSeconds);
       this.uniforms.uForegroundLight.value = foregroundLight?.target.texture ?? null;
       this.uniforms.uForegroundEnabled.value = foregroundLight ? 1 : 0;
       renderer.setRenderTarget(target);
