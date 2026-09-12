@@ -38,8 +38,9 @@ test('the module owns disposable render targets and tracks camera in a fixed hol
 test('direct volume light is folded into the existing composite before crisp foreground geometry', () => {
   const hole = new blackHole.BlackHoleRenderer();
   const camera = new PerspectiveCamera(48, 1, 0.1, 100);
-  const foreground = new Group(), order = [];
-  const light = { target: { texture: {} }, render: () => order.push('volumes') };
+  const foreground = new Group(), order = [], times = [];
+  const light = { target: { texture: {} }, render: (renderer, camera, time) => { order.push('volumes'); times.push(time); } };
+  hole.setDiskRadiance({ target: { texture: {} }, extent: 12.5, render: (renderer, time) => { order.push('capture'); times.push(time); } });
   let target = null;
   const renderer = {
     extensions: { has: () => true }, autoClear: true,
@@ -47,8 +48,9 @@ test('direct volume light is folded into the existing composite before crisp for
     getScissorTest: () => false, setScissorTest() {}, getScissor() {}, setScissor() {}, clear() {},
     render: scene => order.push(scene === hole.rayScene ? 'rays' : scene === hole.compositeScene ? 'composite' : 'foreground'),
   };
-  hole.render(renderer, camera, 0, foreground, light);
-  assert.deepEqual(order, ['rays', 'volumes', 'composite', 'foreground'], 'no second fullscreen MSAA composite is needed');
+  hole.render(renderer, camera, 12, foreground, light);
+  assert.deepEqual(order, ['capture', 'rays', 'volumes', 'composite', 'foreground'], 'no second fullscreen MSAA composite is needed');
+  assert.deepEqual(times, [12, 12], 'the actual simulation timestamp reaches both source-light passes before drawing');
   assert.equal(hole.uniforms.uForegroundLight.value, light.target.texture);
   assert.equal(hole.uniforms.uForegroundEnabled.value, 1);
   hole.render(renderer, camera, 0);
