@@ -50,7 +50,7 @@ async function resultGeometry(page) {
     };
     const port = rect(scroller), first = rect(row);
     const visibleTop = Math.max(0, port.top + scroller.clientTop);
-    const visibleBottom = Math.min(innerHeight, port.top + scroller.clientTop + scroller.clientHeight);
+    const visibleBottom = Math.min(innerHeight, port.bottom, port.top + scroller.clientTop + scroller.clientHeight);
     return {
       port, first, visibleTop, visibleBottom, scrollTop: scroller.scrollTop,
       toolsScrollTop: tools.scrollTop, documentScrollTop: document.scrollingElement.scrollTop,
@@ -70,6 +70,10 @@ async function recordResult(page, testInfo, label) {
   writeFileSync(path, JSON.stringify(result, null, 2));
   await testInfo.attach(label, { path, contentType: 'application/json' });
   await page.screenshot({ path: testInfo.outputPath(`${label}.png`) });
+  // Full-row visibility alone misses subpixel clipping of the focus outline.
+  expect(result.first.top - result.visibleTop, JSON.stringify(result)).toBeGreaterThanOrEqual(5);
+  expect(result.visibleBottom - result.first.bottom, JSON.stringify(result)).toBeGreaterThanOrEqual(5);
+  expect(result.firstHit).toBe(true);
   return result;
 }
 
