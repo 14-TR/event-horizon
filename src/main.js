@@ -112,20 +112,28 @@ function renderNeighbors({ reveal = false } = {}) {
     item.append(button);
     list.append(item);
   }
-  if (reveal && list.firstElementChild) {
-    const first = list.firstElementChild.firstElementChild;
-    // Move focus with the results, not to a now-offscreen pager. Only scroll
-    // the existing viewport; metadata at scrollTop 0 can fill a small phone.
-    const body = list.closest('.neighbor-body');
-    const scroller = getComputedStyle(body).overflowY === 'auto' ? body : $('explore-tools');
-    const port = scroller.getBoundingClientRect();
-    const row = first.getBoundingClientRect();
-    const top = port.top + scroller.clientTop + 5; // Room for the focus outline.
-    const bottom = port.top + scroller.clientTop + scroller.clientHeight - 5;
-    if (row.top < top || row.bottom > bottom) scroller.scrollTop += row.top - top;
-    // Focus last: blurring a changed page input can synchronously rerender.
-    first.focus({ preventScroll: true });
+  if (reveal) revealFirstNeighbor();
+}
+
+function revealFirstNeighbor({ focus = true } = {}) {
+  const first = $('neighbor-list').querySelector('[data-neighbor]');
+  if (!first || !$('neighbor-explorer').open) return;
+  const body = first.closest('.neighbor-body');
+  const scroller = getComputedStyle(body).overflowY === 'auto' ? body : $('explore-tools');
+  const port = scroller.getBoundingClientRect();
+  const row = first.getBoundingClientRect();
+  const top = Math.max(0, port.top + scroller.clientTop) + 5;
+  const bottom = Math.min(innerHeight, port.bottom, port.top + scroller.clientTop + scroller.clientHeight) - 5;
+  if (row.top < top || row.bottom > bottom) {
+    // Disclosure keeps native focus/context and scrolls only as far as needed.
+    // Page/scope changes align the first result. Round away from clipping the
+    // 5px focus outline: scrollTop can quantize fractional layout coordinates.
+    scroller.scrollTop = !focus && row.top >= top
+      ? Math.ceil(scroller.scrollTop + row.bottom - bottom)
+      : Math.floor(scroller.scrollTop + row.top - top);
   }
+  // Focus last: blurring a changed page input can synchronously rerender.
+  if (focus) first.focus({ preventScroll: true });
 }
 
 function applyContext({ sourceId = null, reset = false, locate = false } = {}) {
@@ -190,7 +198,11 @@ function applyContext({ sourceId = null, reset = false, locate = false } = {}) {
 }
 
 function inspectNode(id) {
-  if (explorer?.visit({ clusterId: selectedCluster, nodeId: id || null })) applyContext({ locate: Boolean(id) });
+  if (!explorer?.visit({ clusterId: selectedCluster, nodeId: id || null })) return;
+  applyContext({ locate: Boolean(id) });
+  // Wide, short viewports already have open connections; selection discloses
+  // their results without a details toggle. Do not do this on ordinary Back.
+  if (id) revealFirstNeighbor({ focus: false });
 }
 
 function selectCluster(id) {
@@ -212,7 +224,10 @@ function locateSelected({ announce = false, compact = false } = {}) {
 $('locate-button').addEventListener('click', () => locateSelected({ announce: true, compact: true }));
 $('neighbor-explorer').addEventListener('toggle', () => {
   $('neighbor-explorer').querySelector('summary').setAttribute('aria-label', $('neighbor-explorer').open ? 'Hide connections' : 'Show connections');
-  if (narrowQuery.matches && !cinematic && $('neighbor-explorer').open) locateSelected();
+  if (!cinematic && $('neighbor-explorer').open) {
+    revealFirstNeighbor({ focus: false });
+    if (narrowQuery.matches) locateSelected();
+  }
 });
 $('history-back').addEventListener('click', () => { const sourceId = selectedNode?.id; if (explorer?.back()) applyContext({ sourceId, locate: true }); });
 $('neighbor-filter').addEventListener('change', event => { explorer.setFilter(event.target.value); renderNeighbors({ reveal: true }); });
