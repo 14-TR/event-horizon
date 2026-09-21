@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { validateTopology } from '../topology.js';
+const graph = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url))));
 import { openTools } from './tools.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -113,9 +115,9 @@ test.describe('mobile high-DPI visual acceptance', () => {
     const host = page.locator('#observatory');
     await expect(host).toHaveAttribute('data-quality', 'mobile');
     expect(Number(await host.getAttribute('data-ray-pixels'))).toBeLessThanOrEqual(340000);
-    await expect(host).toHaveAttribute('data-note-stars', '1675');
-    await expect(host).toHaveAttribute('data-trail-stars', '1675');
-    expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(1675 * 3);
+    await expect(host).toHaveAttribute('data-note-stars', String(graph.nodes.length));
+    await expect(host).toHaveAttribute('data-trail-stars', String(graph.nodes.length));
+    expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(graph.nodes.length * 3);
     const caption = page.locator('#singularity-caption');
     if (await caption.isVisible()) {
       const text = await caption.boundingBox(), panel = await page.locator('#sectors-panel').boundingBox();

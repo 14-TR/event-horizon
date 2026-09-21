@@ -89,6 +89,12 @@ test('real topology stars move, pause exactly and remain raycastable at their ne
   }
   expect(id, 'at least one real member must be directly inspectable').toBeTruthy();
   await expect(reticle).toBeVisible();
+  // Locate now tracks its live source. Relinquish that tracking through real
+  // canvas input before measuring source motion relative to a manual camera.
+  const point = await reticle.boundingBox();
+  await page.mouse.move(point.x + point.width / 2, point.y + point.height / 2);
+  await page.mouse.wheel(0, -1);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const initial = await reticle.getAttribute('style');
   const frozen = await frame(page);
   await page.waitForTimeout(200);

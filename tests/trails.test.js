@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseGraph } from '../src/graph.js';
+import { validateTopology as parseGraph } from './topology.js';
 import { buildLayout, DISK, diskPosition } from '../src/layout.js';
 import { createInfall } from '../src/motion.js';
 import { StarTrails } from '../src/star-trails.js';
@@ -13,11 +13,11 @@ test('every real note supplies bounded stellar light trails even in the initial 
     const layout = buildLayout(graph), infall = createInfall(layout);
     const trails = new StarTrails(layout, quality);
     assert.equal(trails.entries.length, graph.nodes.length, 'quality changes trail detail, never note coverage');
-    assert.equal(new Set(trails.entries.map(entry => entry.node.id)).size, 1675);
+    assert.equal(new Set(trails.entries.map(entry => entry.node.id)).size, graph.nodes.length);
     assert.ok(trails.entries.every(entry => layout.nodes.includes(entry.node)));
     infall(0); trails.update(0);
-    assert.ok(trails.mesh.geometry.drawRange.count > 1675, 'frozen opening has true orbital exposure, not sparse points');
-    assert.ok(trails.mesh.geometry.drawRange.count <= 1675 * segments * 2);
+    assert.ok(trails.mesh.geometry.drawRange.count > graph.nodes.length, 'frozen opening has true orbital exposure, not sparse points');
+    assert.ok(trails.mesh.geometry.drawRange.count <= graph.nodes.length * segments * 2);
     const before = trails.mesh.geometry.attributes.position.array.slice();
     trails.update(0);
     assert.deepEqual(trails.mesh.geometry.attributes.position.array, before, 'pause does not grow or fade trails');
@@ -66,7 +66,7 @@ test('micro-exposures never reveal long orbital rails at any quality or simulati
 
 test('per-note recycling truncates exposure without connecting inner and outer radii', () => {
   const layout = buildLayout(graph), infall = createInfall(layout), trails = new StarTrails(layout);
-  const note = layout.nodes[40], wrap = note.orbit.phase * DISK.period;
+  const note = layout.nodes.at(-1), wrap = note.orbit.phase * DISK.period;
   infall(wrap + 0.02); trails.update(wrap + 0.02);
   const recycled = trails.entries.find(entry => entry.node.id === note.id);
   assert.ok(recycled.history.length < trails.segments, 'the short post-wrap exposure is truncated');
@@ -87,7 +87,7 @@ test('per-note recycling truncates exposure without connecting inner and outer r
       assert.ok(Math.hypot(positions[i] - positions[i + 3], positions[i + 1] - positions[i + 4], positions[i + 2] - positions[i + 5]) < 1, 'never a bridge across the disk');
     }
   }
-  trails.selectedCluster = 0; trails.reset();
+  trails.selectedCluster = graph.clusters[0].id; trails.reset();
   assert.equal(trails.mesh.geometry.drawRange.count, 0, 'Reset clears the exposure while paused');
   infall(3.06); trails.update(3.06);
   assert.ok(trails.mesh.geometry.drawRange.count <= graph.clusters[0].count * 5 * 2, 'isolation includes only the selected stream');

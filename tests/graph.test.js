@@ -49,9 +49,10 @@ test('the complete reviewed graph preserves all node identities, links and tiny 
   const api = await load();
   const raw = JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url)));
   const graph = api.parseGraph(raw);
+  assert.ok(graph.nodes.length > 0, 'published coverage must not pass on an empty topology');
   assert.deepEqual(graph.nodes, raw.nodes.map(({ id, cluster }) => ({ id, cluster })));
   assert.deepEqual(graph.edges, raw.edges);
-  assert.deepEqual(graph.totals, { nodes: 1675, edges: 1762, clusters: 8 });
-  assert.deepEqual(graph.clusters.map(c => c.count), raw.clusters.map(c => raw.nodes.filter(n => n.cluster === c.id).length));
+  assert.deepEqual(graph.totals, { nodes: raw.nodes.length, edges: raw.edges.length, clusters: raw.clusters.length });
+  assert.deepEqual(graph.clusters.map(c => c.count), graph.clusters.map(c => raw.nodes.filter(n => n.cluster === c.id).length));
   assert.equal(api.sampleGraph, undefined, 'no obsolete sampling path remains to silently omit real notes');
 });

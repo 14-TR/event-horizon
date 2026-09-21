@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { validateTopology } from '../topology.js';
+
+const graph = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url))));
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   test(`title-only opening discloses every tool without page overflow at ${viewport.width}px`, async ({ page }) => {
@@ -24,7 +28,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await expect(page.locator('#explore-tools')).toBeVisible();
     await expect(page.locator('#title-toggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByLabel('Render quality')).toBeEnabled();
-    await expect(page.locator('.sector-button')).toHaveCount(8);
+    await expect(page.locator('.sector-button')).toHaveCount(graph.clusters.length);
     await page.locator('.sector-button').first().click();
     await expect(page.getByLabel('Inspect an anonymous node')).toBeVisible();
     await page.keyboard.press('Escape');

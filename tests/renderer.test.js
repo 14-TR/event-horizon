@@ -5,6 +5,7 @@ import { BlackHoleRenderer } from '../src/black-hole.js';
 import { buildLayout } from '../src/layout.js';
 import { Observatory } from '../src/scene.js';
 import { rayFragment } from '../src/black-hole-shaders.js';
+import { makeFixture } from './fixture.js';
 
 test('picking rejects a real node behind composite depth but allows the same foreground star', () => {
   const view = Object.create(Observatory.prototype);
@@ -66,11 +67,10 @@ test('observatory installs a bounded world-space ray renderer without decorative
   view.blackHole.dispose();
 });
 
-test('actual moving point buffers carry white-gold inner light and subdued copper outer light', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { parseGraph } = await import('../src/graph.js');
+test('fixed synthetic moving point buffers carry white-gold inner light and subdued copper outer light', async () => {
+  const { validateTopology: parseGraph } = await import('./topology.js');
   const { createInfall } = await import('../src/motion.js');
-  const graph = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
+  const graph = parseGraph(makeFixture({ sectors: 8, perSector: 210 }));
   const view = Object.create(Observatory.prototype);
   view.graph = graph; view.layout = buildLayout(graph); view.infall = createInfall(view.layout);
   view.clusterObjects = new Map(); view.orbital = new Group();
@@ -102,10 +102,12 @@ test('actual moving point buffers carry white-gold inner light and subdued coppe
   }
 });
 
-test('all quality levels build a one-to-one GPU point buffer for the entire actual graph', async () => {
+for (const population of ['published', 'fixed synthetic distribution']) test(`${population}: all quality levels build a one-to-one GPU point buffer for the complete graph`, async () => {
   const { readFileSync } = await import('node:fs');
-  const { parseGraph } = await import('../src/graph.js');
-  const graph = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
+  const { validateTopology: parseGraph } = await import('./topology.js');
+  const graph = parseGraph(population === 'published'
+    ? JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url)))
+    : makeFixture({ sectors: 8, perSector: 210 }));
   const snapshot = structuredClone(graph);
   for (const quality of ['mobile', 'desktop', 'cinematic']) {
     const view = Object.create(Observatory.prototype);
@@ -124,19 +126,23 @@ test('all quality levels build a one-to-one GPU point buffer for the entire actu
       assert.equal(glow.userData.nodes, undefined, 'light envelopes do not own duplicate node identities');
       assert.ok(glow.parent === points, 'hiding/removing a source also hides/removes its light envelope');
       assert.equal(points.geometry.attributes.position.count, points.userData.nodes.length);
+      assert.ok(points.geometry.attributes.aColor.array.every(value => Number.isFinite(value) && value > 0), 'no supplied source is removed by a zero emission mask');
       assert.deepEqual(points.geometry.attributes.position.array, new Float32Array(points.userData.nodes.flatMap(n => n.position)), 'every GPU point is at its actual node coordinate');
       return points.userData.nodes.map(n => n.id);
     });
     assert.deepEqual(drawn.sort(), graph.nodes.map(n => n.id).sort());
-    assert.equal(new Set(drawn).size, 1675);
+    assert.equal(new Set(drawn).size, graph.nodes.length);
     const sizes = [...view.clusterObjects.values()].flatMap(({ points }) => [...points.geometry.attributes.aSize.array]);
-    assert.ok(new Set(sizes.map(size => size.toFixed(2))).size > 80, 'the actual stars need a continuous luminosity hierarchy, not two identical bead sizes');
     assert.ok(sizes.every(size => size >= 2.5 && size <= 16), 'every note retains a nonzero, bounded direct/captured footprint');
-    const rankedSizes = sizes.toSorted((a, b) => a - b);
-    assert.ok(rankedSizes[Math.floor(sizes.length * 0.75)] < 6, 'most actual stars are fine-grained, not equally prominent beads');
-    assert.ok(rankedSizes[Math.floor(sizes.length * 0.95)] > 10, 'rare bright stars lead the hierarchy');
-    assert.ok(sizes.filter(size => size > 10).length < sizes.length * 0.1, 'large stellar cores are genuinely rare');
-    assert.equal(view.host.dataset.noteStars, '1675', 'expose the actual buffer population, not a promised count');
+    // These distribution gates require a known sample size, not today's count.
+    if (population === 'fixed synthetic distribution') {
+      assert.ok(new Set(sizes.map(size => size.toFixed(2))).size > 80, 'the actual stars need a continuous luminosity hierarchy, not two identical bead sizes');
+      const rankedSizes = sizes.toSorted((a, b) => a - b);
+      assert.ok(rankedSizes[Math.floor(sizes.length * 0.75)] < 6, 'most actual stars are fine-grained, not equally prominent beads');
+      assert.ok(rankedSizes[Math.floor(sizes.length * 0.95)] > 10, 'rare bright stars lead the hierarchy');
+      assert.ok(sizes.filter(size => size > 10).length < sizes.length * 0.1, 'large stellar cores are genuinely rare');
+    }
+    assert.equal(view.host.dataset.noteStars, String(graph.nodes.length), 'expose the actual buffer population, not a promised count');
     for (const { points, line } of view.clusterObjects.values()) {
       points.geometry.dispose(); points.material.dispose(); line.geometry.dispose(); line.material.dispose();
     }

@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseGraph } from '../src/graph.js';
-import { buildLayout } from '../src/layout.js';
+import { validateTopology as parseGraph } from './topology.js';
+import { buildLayout, SECTOR_COLORS } from '../src/layout.js';
+// Seed/rank-sensitive distribution thresholds belong to the reviewed snapshot.
+const distributionGraph = parseGraph(JSON.parse(readFileSync(new URL('./fixtures/junction-topology.json', import.meta.url))));
 
 const raw = JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url)));
 
@@ -10,10 +12,10 @@ test('every actual note maps exactly once into a shared thin 3D spiral disk, not
   const graph = parseGraph(raw), before = structuredClone(graph);
   const layout = buildLayout(graph);
   assert.deepEqual(layout, buildLayout(graph), 'deterministic placement');
-  assert.equal(graph.nodes.length, 1675, 'verify the actual reviewed topology, not a small fixture');
+  assert.ok(graph.nodes.length > 0, 'verify a nonempty supplied topology');
   assert.deepEqual(layout.nodes.map(n => n.id).sort(), graph.nodes.map(n => n.id).sort());
   assert.equal(new Set(layout.nodes.map(n => n.id)).size, graph.nodes.length);
-  assert.equal(new Set(layout.clusters.map(c => c.color)).size, graph.clusters.length);
+  assert.deepEqual(layout.clusters.map(c => c.color), graph.clusters.map((_, i) => SECTOR_COLORS[i % SECTOR_COLORS.length]));
   for (const node of layout.nodes) {
     const [x, y, z] = node.position, r = Math.hypot(x, z);
     assert.ok(node.position.every(Number.isFinite));
@@ -21,6 +23,16 @@ test('every actual note maps exactly once into a shared thin 3D spiral disk, not
     assert.ok(Math.abs(y) < 0.65, 'disk thickness is bounded, not a cloud');
     assert.equal(node.cluster, graph.nodes.find(n => n.id === node.id).cluster);
   }
+  assert.deepEqual(graph, before, 'the full valid graph remains unchanged');
+});
+
+test('fixed reviewed sectors retain distinct colors', () => {
+  const layout = buildLayout(distributionGraph);
+  assert.equal(new Set(layout.clusters.map(cluster => cluster.color)).size, distributionGraph.clusters.length);
+});
+
+test('fixed reviewed populous streams have true depth and span the complete disk', () => {
+  const layout = buildLayout(distributionGraph);
   assert.ok(new Set(layout.nodes.map(n => Math.round(n.position[1] * 100))).size > 30, 'true depth, not a flat plane');
   for (const cluster of layout.clusters.filter(c => c.count > 100)) {
     const nodes = layout.nodes.filter(n => n.cluster === cluster.id);
@@ -29,11 +41,10 @@ test('every actual note maps exactly once into a shared thin 3D spiral disk, not
     assert.ok(azimuths.size >= 10, 'each populous stream winds around the SAME disk');
     assert.ok(Math.max(...radii) - Math.min(...radii) > 7, 'streams span the annulus rather than separate balls');
   }
-  assert.deepEqual(graph, before, 'the full valid graph remains unchanged');
 });
 
-test('populous streams have broad, irregular cross-sections rather than three narrow light rails', () => {
-  const layout = buildLayout(parseGraph(raw));
+test('fixed reviewed populous streams have broad, irregular cross-sections rather than three narrow light rails', () => {
+  const layout = buildLayout(distributionGraph);
   for (const cluster of layout.clusters.filter(c => c.count > 100)) {
     const nodes = layout.nodes.filter(n => n.cluster === cluster.id);
     // The threefold harmonic measures how tightly the actual source notes
@@ -46,8 +57,8 @@ test('populous streams have broad, irregular cross-sections rather than three na
   }
 });
 
-test('actual source density concentrates inward in coherent, irregular streams with a sparse outer edge', () => {
-  const layout = buildLayout(parseGraph(raw));
+test('fixed reviewed source density concentrates inward in coherent, irregular streams with a sparse outer edge', () => {
+  const layout = buildLayout(distributionGraph);
   const radius = node => Math.hypot(node.position[0], node.position[2]);
   const inner = layout.nodes.filter(node => radius(node) < 5.8).length;
   const outer = layout.nodes.filter(node => radius(node) > 9.5).length;

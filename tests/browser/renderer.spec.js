@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { validateTopology } from '../topology.js';
+const graph = validateTopology(JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url))));
 import { openTools } from './tools.js';
+import { readFileSync } from 'node:fs';
 
 for (const failure of ['missing-float-extension', 'startup-shader', 'runtime-shader']) {
   test(`${failure} stops rendering and keeps the accessible topology index`, async ({ page }) => {
@@ -47,11 +50,11 @@ test('all-node orbital exposures are bounded, pause exactly and rebuild coherent
   await openTools(page);
   const host = page.locator('#observatory');
   await expect(host).toHaveAttribute('data-renderer', 'webgl');
-  await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(1675);
+  await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(graph.nodes.length);
   const notes = await page.locator('#render-count').textContent();
   await page.getByLabel('Render quality').selectOption('mobile');
-  await expect(host).toHaveAttribute('data-trail-stars', '1675');
-  await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(1675);
+  await expect(host).toHaveAttribute('data-trail-stars', String(graph.nodes.length));
+  await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(graph.nodes.length);
   await page.getByRole('button', { name: 'Resume motion', exact: true }).click();
   await expect.poll(async () => Number(await host.getAttribute('data-trail-segments'))).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Pause motion', exact: true }).click();
@@ -59,7 +62,7 @@ test('all-node orbital exposures are bounded, pause exactly and rebuild coherent
   const stopped = await frame();
   await page.waitForTimeout(200);
   expect((await frame()).equals(stopped)).toBe(true);
-  expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(1675 * 3);
+  expect(Number(await host.getAttribute('data-trail-segments'))).toBeLessThanOrEqual(graph.nodes.length * 3);
   await page.getByRole('button', { name: 'Reset view', exact: true }).click();
   expect((await frame()).equals(stopped), 'home keeps the same frozen orbital exposure').toBe(true);
   await expect(page.locator('#render-count')).toHaveText(notes);

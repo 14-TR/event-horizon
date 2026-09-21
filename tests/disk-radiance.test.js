@@ -2,15 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Group } from 'three';
-import { parseGraph } from '../src/graph.js';
+import { validateTopology as parseGraph } from './topology.js';
+import { makeFixture } from './fixture.js';
 import { buildLayout } from '../src/layout.js';
 import { Observatory } from '../src/scene.js';
 import { StarTrails } from '../src/star-trails.js';
 const disk = await import('../src/disk-radiance.js');
 
-const graph = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
+const publishedGraph = parseGraph(JSON.parse(readFileSync(new URL('../public/graph.json', import.meta.url))));
 
-test('disk radiance reuses every actual note buffer and exposure, never invents image nodes', () => {
+for (const graph of [publishedGraph, parseGraph(makeFixture({ sectors: 3, perSector: 81 })), parseGraph(makeFixture({ sectors: 2, perSector: 13 }))]) test(`disk radiance reuses all ${graph.nodes.length} supplied note buffers and exposures, never invents image nodes`, () => {
   assert.equal(typeof disk.DiskRadiance, 'function', 'actual-note radiance capture must exist');
   for (const [quality, size] of [['mobile', 512], ['desktop', 768], ['cinematic', 1024]]) {
     const view = Object.create(Observatory.prototype);
@@ -49,10 +50,12 @@ test('disk radiance reuses every actual note buffer and exposure, never invents 
       assert.ok(sources.includes(source), 'only real point objects are image sources');
       assert.equal(image.geometry, source.geometry, 'live positions/colors/sizes shared by reference');
       assert.equal(image.userData.nodes, undefined, 'light copies have no pickable identity');
+      assert.equal(source.geometry.attributes.position.count, source.userData.nodes.length);
+      assert.deepEqual(source.geometry.attributes.position.array, new Float32Array(source.userData.nodes.flatMap(node => node.position)), 'the complete supplied IDs own the actual captured point coordinates');
       ids.push(...source.userData.nodes.map(node => node.id));
     }
     assert.deepEqual(ids.sort(), graph.nodes.map(node => node.id).sort());
-    assert.equal(new Set(ids).size, 1675);
+    assert.equal(new Set(ids).size, graph.nodes.length);
     assert.equal(light.trailImage.geometry, trails.mesh.geometry);
     let borrowedDisposed = false, targetDisposed = false;
     sources[0].geometry.addEventListener('dispose', () => { borrowedDisposed = true; });

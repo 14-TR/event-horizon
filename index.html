@@ -15,8 +15,9 @@
       <h1 id="title" aria-label="Event Horizon"><button id="title-toggle" aria-label="Event Horizon — open exploration controls" aria-expanded="false" aria-controls="explore-tools"><span>EVENT</span><span>HORIZON</span></button></h1>
     </header>
 
-    <aside id="explore-tools" aria-label="Exploration controls" hidden inert>
-      <div class="tools-heading"><p class="eyebrow">THE OBSERVATORY</p><button id="about-button" class="icon-button" aria-label="About this observatory">i</button></div>
+    <aside id="explore-tools" data-panel="browse" aria-label="Exploration controls" hidden inert>
+      <div class="tools-heading"><p class="eyebrow">THE OBSERVATORY</p><div><button id="about-button" class="icon-button" aria-label="About this observatory">i</button><button id="close-tools" class="close-tools" aria-label="Close exploration controls">×</button></div></div>
+      <button id="resume-inspection" class="resume-inspection" aria-label="Return to selected note" hidden></button>
       <div class="navigation-controls" aria-label="Camera navigation">
         <div class="navigation-modes" role="group" aria-label="Navigation mode">
           <button id="orbit-button" aria-label="Orbit mode" aria-pressed="true" disabled>Orbit</button>
@@ -24,15 +25,8 @@
         </div>
         <p id="flight-help" hidden><strong>WASD</strong> move · <strong>Q / E</strong> down / up<br>Drag to look, or hold the thrust buttons.<br>Pause freezes stars, not your controls.</p>
       </div>
-      <div id="flight-pad" class="flight-pad" role="group" aria-label="Flight thrust controls" hidden>
-        <button data-flight="left" aria-label="Fly left">←<small>LEFT</small></button>
-        <button data-flight="forward" aria-label="Fly forward">↑<small>FWD</small></button>
-        <button data-flight="back" aria-label="Fly back">↓<small>BACK</small></button>
-        <button data-flight="right" aria-label="Fly right">→<small>RIGHT</small></button>
-        <button data-flight="down" aria-label="Fly down">−<small>DOWN</small></button>
-        <button data-flight="up" aria-label="Fly up">+<small>UP</small></button>
-      </div>
-      <div class="view-controls" role="group" aria-label="View controls"><button id="pause-button" aria-label="Pause motion" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause motion</span></button><button id="reset-button"><span aria-hidden="true">↺</span>Reset view</button></div>
+
+      <div class="view-controls" role="group" aria-label="View controls"><button id="pause-button" aria-label="Pause motion" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause motion</span></button></div>
       <div class="render-controls" role="group" aria-label="Rendering controls">
         <label for="quality-select">QUALITY</label>
         <select id="quality-select" aria-label="Render quality" disabled><option value="mobile">Mobile</option><option value="desktop" selected>Desktop</option><option value="cinematic">Cinematic</option></select>
@@ -50,12 +44,36 @@
         <div class="panel-foot"><span class="status-dot"></span><span id="sector-status">ACQUIRING TOPOLOGY</span></div>
       </section>
       <section id="inspector" class="inspector" aria-labelledby="selection-title">
+        <nav class="inspection-actions" aria-label="Exploration history">
+          <button id="history-back" disabled aria-label="Back to previous node" aria-describedby="history-context">← Back</button>
+          <button id="locate-button" disabled aria-label="Locate selected node">Locate</button>
+          <button id="browse-button" aria-label="Browse streams">Streams</button>
+          <button id="reset-button" aria-label="Reset view">Home</button>
+        </nav>
+        <span id="history-context" class="sr-only"></span>
         <h2 id="selection-title">The whole, connected.</h2>
         <p id="selection-description">Every star in the disk is a note. Warped arcs repeat their light. Isolate a colored stream to explore its connections.</p>
         <div id="node-details" hidden>
           <label class="eyebrow node-label" for="node-select">INSPECT AN ANONYMOUS NODE</label>
           <select id="node-select" aria-label="Inspect an anonymous node"><option value="">Choose an anonymous ID</option></select>
           <dl id="node-facts" hidden><div><dt>Anonymous ID</dt><dd id="node-id"></dd></div><div><dt>Total connections</dt><dd id="node-degree"></dd></div></dl>
+          <details id="neighbor-explorer" hidden>
+            <summary aria-label="Show connections">Follow a connection <span id="neighbor-total"></span></summary>
+            <div class="neighbor-body">
+            <p id="connection-summary"></p>
+            <p id="connection-preview" hidden></p>
+            <label class="sr-only" for="neighbor-filter">Connection scope</label>
+            <select id="neighbor-filter"><option value="all">All connections</option><option value="cross">Across sectors</option><option value="within">Within this stream</option></select>
+            <ol id="neighbor-list" aria-label="Connected notes"></ol>
+            <p id="neighbor-empty" hidden></p>
+            <p id="neighbor-range" role="status" aria-label="Connection page" aria-live="polite"></p>
+            <div id="neighbor-paging">
+              <button id="neighbor-prev" aria-label="Previous connections">←</button>
+              <label>Page <input id="neighbor-page" type="number" min="1" step="1" value="1" inputmode="numeric" aria-label="Go to connection page"> <span id="neighbor-page-total"></span></label>
+              <button id="neighbor-next" aria-label="Next connections">→</button>
+            </div>
+            </div>
+          </details>
           <p id="sector-render-count" class="node-population-note"></p>
         </div>
         <div class="interaction-guide" id="interaction-guide"><div>Drag to orbit · scroll to approach</div><div>Select a direct star to inspect</div></div>
@@ -65,6 +83,17 @@
       <footer>THE STRUCTURE REMAINS.<br>THE STORIES STAY PRIVATE.</footer>
     </aside>
 
+    <div id="flight-pad" class="flight-pad" role="group" aria-label="Flight thrust controls" hidden>
+      <div class="flight-pad-heading"><span class="eyebrow">FREE FLIGHT</span><button id="flight-home" aria-label="Return to home view">Home</button><button id="flight-exit" aria-label="Exit free flight">End flight</button></div>
+      <div class="flight-directions">
+        <button data-flight="left" aria-label="Fly left">←<small>LEFT</small></button>
+        <button data-flight="forward" aria-label="Fly forward">↑<small>FWD</small></button>
+        <button data-flight="back" aria-label="Fly back">↓<small>BACK</small></button>
+        <button data-flight="right" aria-label="Fly right">→<small>RIGHT</small></button>
+        <button data-flight="down" aria-label="Fly down">−<small>DOWN</small></button>
+        <button data-flight="up" aria-label="Fly up">+<small>UP</small></button>
+      </div>
+    </div>
     <main aria-label="Immersive observatory">
       <div id="observatory" class="observatory" data-renderer="pending"></div>
       <div class="vignette" aria-hidden="true"></div>
@@ -81,8 +110,8 @@
     <p><strong>Topology is not guaranteed anonymity.</strong> A distinctive pattern of connections can fingerprint a graph, even without its content.</p>
     <p>Every colored star in the disk is an actual note. All notes are included on desktop and mobile: sectors form interleaved spiral streams within one thin, three-dimensional accretion disk. Notes rotate inward and wrap individually to the outer edge, always outside the absorbing horizon. No note or connection is deleted, and no invented notes fill the disk.</p>
     <p>The dim background sky is separate decorative artwork. A bounded, camera-dependent ray approximation samples a disk-space image of the actual note stars, their finite light envelopes and short trails: far-side light bends into upper and lower arcs around the black shadow. Each flow-aligned envelope belongs to a real note; overlapping source light forms the luminous disk. <strong>Warped arcs are noninteractive repeated light, not extra notes.</strong> Inspect a direct star or use the complete anonymous ID selector. The source image also retains emission-weighted note height. A bounded shallow-depth correction and directional footprint filter reconstruct the warped streams; overlapping heights are still averaged. A soft geometric weighting reduces duplicate visible-source images and deliberately omits some secondary light. Brightness is artistically graded. This is not a full gravity simulation, exact physical lensing, or an energy-conserving transfer model. The narrow luminous images and modest highlights are emitted light, not a reflective surface. Source-independent procedural gas is disabled.</p>
-    <p>Short colored trails are bounded exposures of those same notes along their actual visual trajectories, including in the frozen opening. Isolating a sector reveals only its stream and real within-sector connections. Cross-sector connections remain in the data and total neighbor counts. The count reports notes included in the disk, not pixels currently visible through the horizon or viewport.</p>
-    <p>Select the title to reveal the tools. Drag to orbit; scroll or pinch to approach. Free flight uses WASD, Q/E, or the touch thrust controls. Escape returns to the scene. Reduced motion starts paused, with all navigation still available.</p>
+    <p>Short colored trails are bounded exposures of those same notes along their actual visual trajectories, including in the frozen opening. Isolating a sector reveals its stream. Selecting a note adds a bounded spatial preview of its real connections, including cross-sector endpoints; the preview count reports submitted relationships, not visible line fragments. The paged connection list reaches every neighbor and separates within-stream and cross-sector counts. The notes-in-disk count reports included notes, not pixels currently visible through the horizon or viewport.</p>
+    <p>Select the title to reveal the tools. Drag to orbit; scroll or pinch to approach. Follow a connection to visit its actual neighbor; Back restores the previous note, stream and connection-list context. Locate frames the selected note in the open scene. Home resets all streams and clears the exploration path. Free flight uses WASD, Q/E, or the touch thrust controls. An explicitly enabled flight pad stays available after closing the tools; End flight returns to orbit. Escape returns to the scene without clearing selection. Reduced motion starts paused, with all navigation still available.</p>
     <button id="close-about-done" class="text-button">Back to the observatory</button>
   </dialog>
   <noscript><div class="noscript-notice">Event Horizon needs JavaScript for its 3D observatory. This site contains anonymous connection topology, not note titles or content.</div></noscript>

@@ -1,5 +1,7 @@
 # Event Horizon — roadmap
 
+> The dated baseline and milestone sequence below preserve the September 10 planning draft, not current implementation or deployment status. Reconcile them against the latest reviewed release before starting work; they do not reactivate superseded experiments or authorize a vault refresh. The privacy and contribution boundaries remain in force.
+
 ## Product direction
 A cinematic, interactive black-hole atlas of anonymous knowledge structure. The scene, not a dashboard, is the product. Every published note is a star in one shared accretion disk; sectors are distinguishable streams within it. Begin with only the title and black hole, then progressively reveal exploration tools.
 
@@ -13,7 +15,7 @@ Local HEAD at planning time: `b535888`. The working tree contains staged and uns
 ## Ordered milestones
 Dates are deliberately not promised before the current renderer work is reconciled and measured. Each milestone ends in a bounded, independently reviewed release; optional work must not hold a passing release hostage.
 
-### M0 — Establish a trustworthy baseline (next)
+### M0 — Establish a trustworthy baseline (next in the original plan)
 - Identify the active owner and reconcile the existing renderer work without resetting or overwriting it.
 - Record the candidate SHA, current public release identity, outstanding failures and a short acceptance checklist.
 - Run unit tests, production build and production-browser checks. Capture frozen desktop/mobile, inclined and genuinely edge-on views, plus untouched title-only openings.
@@ -56,8 +58,13 @@ Dates are deliberately not promised before the current renderer work is reconcil
 - Every published note remains represented across desktop/mobile and every quality; verify actual GPU buffers/draws and exhaustive ID selectors, not displayed totals alone.
 - Usable orbit, flight, zoom, sector isolation, inspection, reset and motion pause; keyboard controls, reduced motion and graceful WebGL failure.
 - Anonymous dataset only. Original text, titles, tags, filenames, source paths, mappings and raw exports never enter this repository, issues, logs or bundles.
-- No analytics, paid services or automatic vault refresh. Topology can still be identifying; this is metadata minimization, not guaranteed anonymity.
+- No analytics or paid services. Any private daily local anonymous refresh or publication requires separate explicit owner authorization; routine app contributions and the deployed application do not access the vault. Topology can still be identifying; this is metadata minimization, not guaranteed anonymity.
 - Tests and production build pass; independent exact-commit review precedes publication; deployed release SHA and browser behavior are read back and verified.
+
+## Daily anonymous refresh boundary
+A separately authorized daily workflow must sanitize locally and validate the complete candidate against the existing closed-world anonymous schema before publication. It must preserve every accepted node ID and real connection, run unit tests and a production build, and retain private failure receipts. Exporter code, schedules, credentials, raw material, semantic labels, source mappings and local paths do not belong in this repository. Compatibility changes do not authorize or enable scheduling, vault access or publication.
+
+Public acceptance derives totals, complete ID sets, degrees and draw populations from validated supplied data. Synthetic additions/removals cover changing counts; explicitly pinned rendering fixtures preserve fixed-pixel and distribution regressions without silently relaxing their thresholds. The privacy whitelist and independent exact-commit review gate remain unchanged.
 
 ## Execution rule
 Work in milestone order with one implementation stream owning the renderer at a time. Select the smallest demonstrably missing improvement, state its acceptance test, and release when that test and the always-on gates pass. Report verified releases and genuine blockers, not empty hourly commits. Follow the existing contribution boundaries below.
