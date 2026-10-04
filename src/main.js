@@ -314,9 +314,16 @@ function showWebGLFallback() {
 }
 
 async function init() {
-  const response = await fetch(`${import.meta.env.BASE_URL}graph.json`, { credentials: 'omit' });
-  if (!response.ok) throw new Error('Topology unavailable.');
-  graph = parseGraph(await response.json());
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(`${import.meta.env.BASE_URL}graph.json`, { credentials: 'omit', signal: controller.signal });
+    if (!response.ok) throw new Error('Topology unavailable.');
+    // Keep the deadline active through the body, not just response headers.
+    graph = parseGraph(await response.json());
+  } finally {
+    clearTimeout(timeout);
+  }
   explorer = createExploration(graph);
   $('notes-total').textContent = format(graph.totals.nodes);
   $('links-total').textContent = format(graph.totals.edges);
