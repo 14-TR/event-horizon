@@ -21,7 +21,7 @@ test('real public topology has truthful counts and discoverable tiny sectors', a
   await expect(page.locator('#links-total')).toHaveText(fmt(raw.edges.length));
   await expect(page.locator('.sector-button')).toHaveCount(raw.clusters.length);
   await expect(page.locator('#render-count')).toHaveText(`${fmt(raw.nodes.length)} / ${fmt(raw.nodes.length)}`);
-  await expect(page.locator('#sector-status')).toHaveText('ALL NOTES FORM THE DISK');
+  await expect(page.locator('#sector-status')).toHaveText('ALL STARS FORM THE DISK');
   await page.screenshot({ path: 'test-results/real-topology-desktop.png', fullPage: true });
   const smallest = [...raw.clusters].sort((a, b) => a.count - b.count)[0];
   await page.locator(`.sector-button[data-cluster="${smallest.id}"]`).click();

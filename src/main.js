@@ -88,7 +88,7 @@ function renderNeighbors({ reveal = false } = {}) {
   $('neighbor-next').disabled = result.page === result.pages - 1;
   $('neighbor-paging').hidden = result.filtered === 0;
   $('neighbor-empty').hidden = result.filtered !== 0;
-  $('neighbor-empty').textContent = result.total ? 'No connections in this scope. Try all connections.' : 'No connections. This note is an isolated star.';
+  $('neighbor-empty').textContent = result.total ? 'No connections in this scope. Try all connections.' : 'No connections. This is an isolated star.';
   const list = $('neighbor-list');
   list.start = result.start;
   list.replaceChildren();
@@ -162,7 +162,7 @@ function applyContext({ sourceId = null, reset = false, locate = false } = {}) {
   }
   const cluster = graph.clusters.find(item => item.id === selectedCluster);
   const nodes = graph.nodes.filter(node => selectedCluster === null || node.cluster === selectedCluster);
-  $('sector-status').textContent = scene ? (cluster ? 'ONE STREAM ISOLATED' : 'ALL NOTES FORM THE DISK') : 'ACCESSIBLE TOPOLOGY INDEX';
+  $('sector-status').textContent = scene ? (cluster ? 'ONE STREAM ISOLATED' : 'ALL STARS FORM THE DISK') : 'ACCESSIBLE TOPOLOGY INDEX';
   $('render-count').textContent = `${format(scene ? nodes.length : 0)} / ${format(graph.nodes.length)}`;
   $('node-details').hidden = !cluster;
   $('node-facts').hidden = !selectedNode;
@@ -171,15 +171,15 @@ function applyContext({ sourceId = null, reset = false, locate = false } = {}) {
   $('view-name').textContent = cluster ? cluster.label.toUpperCase() : 'ALL SYSTEMS';
   $('selection-title').textContent = cluster?.label || 'The whole, connected.';
   $('selection-description').textContent = cluster
-    ? `${format(cluster.count)} notes in this disk stream. Select a star, or choose an anonymous ID below.`
-    : 'Every star in the disk is a note. Warped arcs repeat their light. Isolate a colored stream to explore its connections.';
+    ? `${format(cluster.count)} stars in this disk stream. Select a star, or choose an anonymous ID below.`
+    : 'Every star is an atlas record. Warped arcs repeat their light. Isolate a colored stream to explore its retained connections.';
   if (cluster) {
     if (clusterChanged || $('node-select').options.length < 2) {
       $('node-select').replaceChildren(new Option('Choose an anonymous ID', ''));
       for (const node of nodes) $('node-select').append(new Option(`${node.id} · ${cluster.label}`, node.id));
     }
     $('node-select').value = selectedNode?.id || '';
-    $('sector-render-count').textContent = `${format(nodes.length)} / ${format(cluster.count)} sector notes ${scene ? 'in the disk' : 'listed'}.`;
+    $('sector-render-count').textContent = `${format(nodes.length)} / ${format(cluster.count)} sector stars ${scene ? 'in the disk' : 'listed'}.`;
     $('explore-tools').scrollTop = 0;
   }
   const previous = explorer.previous;
@@ -189,11 +189,11 @@ function applyContext({ sourceId = null, reset = false, locate = false } = {}) {
     $('node-id').textContent = selectedNode.id;
     $('reticle-label').textContent = selectedNode.id;
     renderNeighbors();
-    $('announcement').textContent = `${selectedNode.id}, ${cluster.label}. ${format(explorer.neighbors().total)} total connections.`;
+    $('announcement').textContent = `${selectedNode.id}, ${cluster.label}. ${format(explorer.neighbors().total)} retained connections.`;
     if (locate) locateSelected({ compact: true });
   } else {
     $('node-reticle').hidden = true;
-    $('announcement').textContent = cluster ? `${cluster.label} isolated. ${format(cluster.count)} notes.` : 'View reset. All sectors visible.';
+    $('announcement').textContent = cluster ? `${cluster.label} isolated. ${format(cluster.count)} stars.` : 'View reset. All sectors visible.';
   }
 }
 
@@ -214,7 +214,7 @@ function selectCluster(id) {
 function locateSelected({ announce = false, compact = false } = {}) {
   if (!selectedNode) return false;
   if (compact && narrowQuery.matches) $('neighbor-explorer').open = false;
-  const blockers = ['.intro', '#explore-tools', '#flight-pad', '#fallback'].map(selector => document.querySelector(selector))
+  const blockers = ['.intro', '#explore-tools', '#flight-pad', '#fallback', '#history-notice'].map(selector => document.querySelector(selector))
     .filter(element => element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden')
     .map(element => element.getBoundingClientRect());
   const located = locateSelection(scene, selectedNode.id, $('observatory').getBoundingClientRect(), blockers);
@@ -260,7 +260,7 @@ function renderSectors() {
     button.className = 'sector-button';
     button.dataset.cluster = cluster.id;
     button.style.setProperty('--sector-color', SECTOR_COLORS[index % SECTOR_COLORS.length]);
-    button.setAttribute('aria-label', `${cluster.label}, ${format(cluster.count)} notes`);
+    button.setAttribute('aria-label', `${cluster.label}, ${format(cluster.count)} stars`);
     button.setAttribute('aria-pressed', 'false');
     const dot = document.createElement('span');
     dot.className = 'sector-dot';
@@ -330,7 +330,7 @@ async function init() {
   $('sectors-total').textContent = format(graph.totals.clusters).padStart(2, '0');
   $('sector-fraction').textContent = `${String(graph.clusters.length).padStart(2, '0')} DETECTED`;
   $('render-count').textContent = `${format(graph.nodes.length)} / ${format(graph.nodes.length)}`;
-  $('sector-status').textContent = 'ALL NOTES FORM THE DISK';
+  $('sector-status').textContent = 'ALL STARS FORM THE DISK';
   renderSectors();
   try {
     scene = new Observatory($('observatory'), graph, {
@@ -413,7 +413,7 @@ document.addEventListener('keydown', event => {
   if (!cinematic) setCinematic(true);
 });
 
-$('about-button').addEventListener('click', () => { flightPad.clear(); $('about-dialog').showModal(); });
+for (const id of ['about-button', 'history-notice']) $(id).addEventListener('click', () => { flightPad.clear(); $('about-dialog').showModal(); });
 for (const id of ['close-about', 'close-about-done']) $(id).addEventListener('click', () => $('about-dialog').close());
 
 $('retry-button').addEventListener('click', () => {

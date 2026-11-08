@@ -18,7 +18,7 @@ test('loads a cinematic observatory with truthful anonymous topology', async ({ 
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
   await expect(page.locator('#notes-total')).toHaveText(String(fixture.nodes.length));
   await expect(page.locator('#links-total')).toHaveText(String(fixture.edges.length));
-  await expect(page.getByRole('button', { name: /Sector 01.*72 notes/ }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Sector 01.*72 stars/ }).first()).toBeVisible();
   await expect(page.locator('body')).not.toContainText('PRIVATE_NOT_A_SECTOR');
   await expect(page.locator('#render-count')).toContainText('432 / 432');
   await page.screenshot({ path: 'test-results/observatory-desktop.png' });
@@ -27,7 +27,7 @@ test('loads a cinematic observatory with truthful anonymous topology', async ({ 
 
 test('keyboard sector isolation, anonymous node inspection and reset work end to end', async ({ page }) => {
   await loadFixture(page);
-  const sector = page.getByRole('button', { name: 'Sector 01, 72 notes', exact: true });
+  const sector = page.getByRole('button', { name: 'Sector 01, 72 stars', exact: true });
   await sector.focus();
   await page.keyboard.press('Enter');
   await expect(sector).toHaveAttribute('aria-pressed', 'true');
@@ -71,7 +71,7 @@ test('reduced motion starts paused and orbit, zoom, resume and reset are real', 
 test('picks a real 3D node through raycasting rather than a decorative hotspot', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await loadFixture(page);
-  await page.getByRole('button', { name: 'Sector 01, 72 notes', exact: true }).click();
+  await page.getByRole('button', { name: 'Sector 01, 72 stars', exact: true }).click();
   await page.getByLabel('Inspect an anonymous node').selectOption('n000001');
   const reticle = page.locator('#node-reticle');
   await expect(reticle).toBeVisible();
@@ -95,7 +95,7 @@ test('WebGL fallback keeps accessible topology inspection available', async ({ p
   await expect(page.locator('#fallback-title')).toHaveText('3D is unavailable.');
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'fallback');
   await page.getByRole('button', { name: 'Explore the topology' }).click();
-  await page.getByRole('button', { name: 'Sector 01, 72 notes', exact: true }).click();
+  await page.getByRole('button', { name: 'Sector 01, 72 stars', exact: true }).click();
   await page.getByLabel('Inspect an anonymous node').selectOption('n000001');
   await expect(page.locator('#node-id')).toHaveText('n000001');
   await expect(page.locator('#pause-button')).toBeDisabled();

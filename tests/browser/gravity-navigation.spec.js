@@ -5,7 +5,7 @@ import { browseStreams } from './tools.js';
 
 /**
  * Sprint Gravity UI contract (no scene mocks or test-only production hooks):
- * - list "Connected notes", buttons "Follow n######" + optional sector text;
+ * - list "Connected stars", buttons "Follow n######" + optional sector text;
  * - buttons "Next connections" / "Previous connections", disabled at ends;
  * - status "Connection page", visible "1–12 of 814" range (prefix allowed);
  * - optional "Show connections" button discloses the list;
@@ -17,7 +17,7 @@ import { browseStreams } from './tools.js';
 const publicGraph = JSON.parse(readFileSync(new URL('../../public/graph.json', import.meta.url), 'utf8'));
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
 const MAX_MOUNTED_NEIGHBORS = 24;
-const list = page => page.getByRole('list', { name: 'Connected notes', exact: true });
+const list = page => page.getByRole('list', { name: 'Connected stars', exact: true });
 const followButtons = page => list(page).getByRole('button', { name: /^Follow n\d{6,12}\b/, includeHidden: true });
 const next = page => page.getByRole('button', { name: 'Next connections', exact: true, includeHidden: true });
 const previous = page => page.getByRole('button', { name: 'Previous connections', exact: true, includeHidden: true });
@@ -66,7 +66,7 @@ async function loadFallback(page, raw, { published = false } = {}) {
 
 function sectorButton(page, graph, id) {
   const sector = graph.sectors.find(sector => sector.id === id);
-  return page.getByRole('button', { name: `${sector.label}, ${fmt(sector.count)} notes`, exact: true, includeHidden: true });
+  return page.getByRole('button', { name: `${sector.label}, ${fmt(sector.count)} stars`, exact: true, includeHidden: true });
 }
 
 async function inspect(page, graph, node) {

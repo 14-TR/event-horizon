@@ -1,6 +1,8 @@
 # Event Horizon
 
-A cinematic, interactive observatory of a second brain’s connection topology. **Every actual note forms the accretion disk itself**: luminous gold, copper and colored stars in shared three-dimensional spiral streams around a black core. Orbit the disk or fly among its moving notes.
+A cinematic, interactive observatory of a second brain’s retained connection topology. **Every atlas record forms the accretion disk itself**: luminous gold, copper and colored stars in shared three-dimensional spiral streams around a black core. Orbit the disk or fly among its moving stars.
+
+**Cumulative atlas · legacy may overlap current notes.** UNMAPPED legacy stars and connections are retained. Their original note mappings are unavailable and they may overlap currently tracked notes. Star totals are cumulative atlas records, not a unique current-note count. The scene notice opens About; the same full disclosure appears beside the browse totals and in About. Technical references below to “notes” or “note-stars” mean atlas nodes, including retained history, not deduplicated current notes.
 
 Built with **Vite, Three.js, and plain JavaScript**. All artwork is generated locally. Fonts are local system fonts. There are no remote textures, font services, analytics, or runtime third-party requests.
 
@@ -30,7 +32,7 @@ The production base is **`/event-horizon/`**, suitable for a GitHub Pages projec
 
 ## Explore
 
-- **The opening is the title and the scene.** Select **EVENT HORIZON** to reveal a single scrollable exploration drawer; select it again or press **Escape** to return to the scene. The title is a keyboard/touch button with an explicit accessible label and expanded state. Hidden tools are inert, not deleted. No dashboard or exit-button chrome competes with the opening.
+- **The opening is the title, the scene and one discreet cumulative-history notice.** Select **EVENT HORIZON** to reveal a single scrollable exploration drawer; select it again or press **Escape** to return to the scene. The title and history notice are keyboard/touch buttons. Hidden tools are inert, not deleted; the history notice stays available, including in fallback and error states. No dashboard or exit-button chrome competes with the opening.
 - **Orbit mode:** drag to orbit in 3D; **scroll or pinch** to zoom. Right-drag pans.
 - **Fly mode:** **WASD** moves forward/back/left/right relative to your view; **Q / E** moves down/up. **Drag** on the sky to look around. The six **hold-to-move thrust buttons** also work with touch or Space/Enter. Releasing or cancelling input stops movement immediately; changing tabs or losing focus clears held inputs. Flight stays within the scene and outside the central horizon.
 - Select a **sector button** to isolate its colored stream within the same disk. Its real within-sector connections become visible. Large streams keep the disk-wide view; tiny sectors are approached for inspection. Orbit follows the selected sector’s center. Selecting an active sector again clears isolation. Switching to Fly releases tracking without clearing the selected stream.
@@ -45,7 +47,7 @@ The production base is **`/event-horizon/`**, suitable for a GitHub Pages projec
 
 ## What the picture means
 
-### The notes are the disk
+### The atlas stars are the disk
 
 There is **one luminous star per actual node**, with no detached sector clouds, desktop/mobile subsampling, or invented particles filling gaps. Each sector follows one broad, seeded, irregular spiral stream rather than three equally spaced rails. A finite-slope radial residence curve concentrates actual notes into a broad inner reservoir, leaving a sparse outer edge without piling them onto an infinitesimal rim. ID-stable sprite sizes span 3.1–14.1 shader size units: most stars are fine-grained and fewer than one in ten have sizes above 10. Tiny sectors are not inflated with giant stars or synthetic notes; the complete selector preserves their discoverability.
 
@@ -75,9 +77,9 @@ Direct note-stars remain ordinary 3D objects, so foreground stars and trails sti
 
 ### Connections and membership
 
-Only **real within-sector connections** are drawn, revealed on isolation so straight graph edges do not mask the stellar spiral structure. Cross-sector links remain unchanged in the full graph and total neighbor counts, but are not drawn. There is an 8,000 within-sector edge drawing ceiling; it does not affect the current graph or any note/neighbor count.
+Only **retained within-sector connections** are drawn, revealed on isolation so straight graph edges do not mask the stellar spiral structure. These historical relationships are not exclusively current live-note links. Cross-sector links remain unchanged in the full graph and total neighbor counts, but are not drawn. There is an 8,000 within-sector edge drawing ceiling; it does not affect the supplied graph or any star/neighbor count.
 
-Sector membership comes from the supplied export. The current export uses anonymized folder-derived sectors, **not inferred semantic communities**. All labels are generated as `Sector 01`, `Sector 02`, and so on.
+Sector membership comes from the supplied export's persistent display sectors, **not inferred semantic communities or a claim about every current folder**. Retained stars keep their display membership. All labels are generated as `Sector 01`, `Sector 02`, and so on.
 
 ### Render budgets and truthful counts
 
@@ -93,7 +95,7 @@ Lensing adds one bounded RGBA16F source target with mipmaps (approximately **2.6
 
 Browser coverage tests assert actual direct/captured instance populations, the direct pass's single-sample framebuffer and its pixel budget at every quality. For optional local hardware timing, `tests/measure-gpu.mjs` accepts `EH_GPU_VARIANTS` (JSON entries with `name`, production `url`, and immutable `sha`) and `EH_GPU_DIR`. It rotates build order over five rounds per desktop/mobile viewport, verifies frozen cameras and served-asset hashes, and records GPU timers around every production draw (four per occupied sector plus four shared draws at the unselected frozen opening). `EH_GPU_MAX_RATIO=1.25` additionally gates the median-of-rounds successor/base GPU ratio for variants named `successor` and `base`. Unsupported/software timers or disjoint results fail rather than silently passing. Keep those measurements separate from browser presentation and headless rAF pacing, inspect the recorded round-to-round spread, and do not generalize desktop emulation to physical phone or Safari performance.
 
-Topology totals change with the supplied validated dataset. Before isolation, both desktop and mobile report **N / N notes in disk**, where N is the complete validated node count, not a fixed release total. During isolation, the numerator is the selected stream’s complete population. These are included-note counts, **not on-screen pixel, visibility or occlusion counts**. The top totals always describe the complete validated graph. The inspector separately reports included/total sector notes. WebGL fallback reports zero rendered notes while retaining every ID in the accessible index. Future exports may change the totals.
+Topology totals change with the supplied validated dataset. Before isolation, both desktop and mobile report **N / N STARS IN DISK**, where N is the complete validated atlas-node count, not a unique current-note count or fixed release total. During isolation, the numerator is the selected stream’s complete population. These are included-star counts, **not on-screen pixel, visibility or occlusion counts**. **CUMULATIVE STARS** and **CUMULATIVE CONNECTIONS** always describe the complete retained graph. The inspector separately reports included/total sector stars. WebGL fallback reports zero rendered stars while retaining every ID in the accessible index. Future exports may change the totals.
 
 ## Verification
 
