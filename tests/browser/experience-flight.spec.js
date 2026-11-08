@@ -11,7 +11,8 @@ test('explicit touch flight survives closing tools, moves the real camera and st
   await page.goto('./');
   await expect(page.locator('#observatory')).toHaveAttribute('data-renderer', 'webgl');
   await expect(page.locator('#flight-pad')).toBeHidden();
-  await expect(page.locator('button:visible')).toHaveCount(1);
+  await expect(page.locator('button:visible')).toHaveCount(2);
+  await expect(page.locator('#history-notice')).toBeVisible();
   await page.locator('#title-toggle').tap();
   await page.getByRole('button', { name: 'Fly mode', exact: true }).tap();
   await page.getByRole('button', { name: 'Close exploration controls', exact: true }).tap();

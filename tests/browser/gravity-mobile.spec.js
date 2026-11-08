@@ -78,7 +78,7 @@ async function load(page, { fixture = false } = {}) {
 
 function sectorButton(page, clusterId) {
   const label = `Sector ${String(sectorIds.indexOf(clusterId) + 1).padStart(2, '0')}`;
-  return page.getByRole('button', { name: `${label}, ${fmt(raw.nodes.filter(node => node.cluster === clusterId).length)} notes`, exact: true, includeHidden: true });
+  return page.getByRole('button', { name: `${label}, ${fmt(raw.nodes.filter(node => node.cluster === clusterId).length)} stars`, exact: true, includeHidden: true });
 }
 
 async function inspectHub(page) {
@@ -146,7 +146,7 @@ async function assertUncoveredSource(page, id, testInfo, label, { pick = true } 
 async function followCross(page) {
   expect(cross.cluster).not.toBe(hub.cluster);
   expect(adjacency.get(hub.id).has(cross.id)).toBe(true);
-  const list = page.getByRole('list', { name: 'Connected notes', exact: true });
+  const list = page.getByRole('list', { name: 'Connected stars', exact: true });
   const target = list.getByRole('button', { name: new RegExp(`^Follow ${cross.id}\\b`) });
   if (!await list.isVisible()) {
     const disclosure = page.getByLabel('Show connections', { exact: true });
@@ -239,7 +239,8 @@ for (const viewport of [{ width: 960, height: 720 }, ...phones]) {
     await expect(title).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#explore-tools')).toBeHidden();
     await expect(page.getByRole('group', { name: 'Flight thrust controls', exact: true })).toBeHidden();
-    await expect(page.locator('button:visible')).toHaveCount(1);
+    await expect(page.locator('button:visible')).toHaveCount(2);
+    await expect(page.locator('#history-notice')).toBeVisible();
     await expect(page.locator('#inspector')).toBeHidden();
     expect(await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }))).toEqual(viewport);
     await page.screenshot({ path: testInfo.outputPath(`untouched-${viewport.width}.png`) });

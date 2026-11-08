@@ -18,7 +18,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await expect(page.locator('#sectors-panel')).toBeHidden();
     await expect(page.locator('#inspector')).toBeHidden();
     const visibleButtons = await page.locator('button:visible').all();
-    expect(visibleButtons).toHaveLength(1);
+    expect(visibleButtons).toHaveLength(2);
+    await expect(page.locator('#history-notice')).toBeVisible();
     expect(await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }))).toEqual(viewport);
     const canvas = await page.locator('#observatory canvas').boundingBox();
     expect(canvas.width).toBe(viewport.width);
